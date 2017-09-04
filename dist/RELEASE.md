@@ -32,6 +32,8 @@ How to do a release of Ceylon.
   - $ ./dist/reversion.sh ${RELVER}.osgi-4 ${RELVER}.osgi-5
   - Update `common/com/redhat/ceylon/common/Versions.java` (the `CEYLON_VERSION_QUALIFIER`)
   - Change `versionQualifier` in `language/src/ceylon/language/language.ceylon` from `"SNAPSHOT"` to `""`
+  - Make sure `compiler-js/.../JsModuleSourceMapper.java#loadModuleFromMap()` has been updated!
+  - Make sure `ceylon-module-resolver/.../dist-overrides.xml` has been updated!
   - Commit and push
 3. Reversion master
   - $ git checkout master
@@ -71,7 +73,7 @@ How to do a release of Ceylon.
 2. Update the [repo build file](https://github.com/ceylon/ceylon-debian-repo/blob/master/repo/build.sh)
 3. Commit and push to master
 4. Then run this script that will make a branch for the new version and make most of the necessary changes
-  - $ ./new-version.sh ${RELVER} **X0Y0Z0**
+  - $ ./new-version.sh ${RELVER}
 5. Edit the `dist-pkg/debian/changelog` file by hand or use:
   - $ dch -i
 6. Commit and push the new branch
@@ -121,17 +123,7 @@ NB: To be able to sign packages the user running the docker command for generati
  - If everything went ok run `./build.sh --push`
  - Edit the [Full Description](https://hub.docker.com/r/ceylon/ceylon/), adding a new image/tag line and moving the `latest` tag
  - Update the `README.md` to be the same as the full description
- - Commit all changes
-
-## ceylon-docker/s2i-ceylon
-
- - Check out [ceylon-docker/s2i-ceylon](https://github.com/ceylon-docker/s2i-ceylon)
- - Edit the `build.sh` and add the new version to the front of the `VERSIONS` list and change the `LATEST` value
- - Run `./build.sh --build`
- - If everything went ok run `./build.sh --push`
- - Edit the [Full Description](https://hub.docker.com/r/ceylon/s2i-ceylon/), adding a new image/tag line and moving the `latest` tag
- - Update the `README.md` to be the same as the full description
- - Commit all changes
+ - Commit and push all changes
 
 ## ceylon-docker/source-runner
 
@@ -141,8 +133,32 @@ NB: To be able to sign packages the user running the docker command for generati
  - If everything went ok run `./build.sh --push`
  - Edit the [Full Description](https://hub.docker.com/r/ceylon/source-runner/), adding a new image/tag line and moving the `latest` tag
  - Update the `README.md` to be the same as the full description
- - Commit all changes
+ - Commit and push all changes
 
+## ceylon-docker/s2i-ceylon
+
+ - Check out [ceylon-docker/s2i-ceylon](https://github.com/ceylon-docker/s2i-ceylon)
+ - Edit the `build.sh` and add the new version to the front of the `VERSIONS` list and change the `LATEST` value
+ - Run `./build.sh --build`
+ - If everything went ok run `./build.sh --push`
+ - Edit the [Full Description](https://hub.docker.com/r/ceylon/s2i-ceylon/), adding a new image/tag line and moving the `latest` tag
+ - Update the `README.md` to be the same as the full description
+ - Edit the [image-streams.json](https://github.com/ceylon-docker/s2i-ceylon/blob/master/image-streams.json) file and add the new version (copy an older version and change it) and update the `"latest"` section with the new version.
+ - Commit and push all changes
+
+## ceylon/ceylon-examples-web
+
+This example project is used by the above `ceylon-docker/s2i-ceylon` project
+
+ - Check out [ceylon/ceylon-examples-web](https://github.com/ceylon/ceylon-examples-web)
+ - Make sure you're using the correct Ceylon version that you are releasing before continuing!
+ - In the project folder run `ceylon bootstrap --force`
+ - Now look for references to the old version in all the files and change them to the new version
+ - **IMPORTANT**: take special care with the `web-content/js/graph.js` file! Read the comment carefully. The list of Ceylon versions there should contain **all** the **old** versions that are compatible with the current release!
+ - Commit all changes
+ - Add a tag for the new version
+ - Push everything (including tags)
+ 
 # Publishing to the Herd
 
 *This depends on the ceylon/ceylon Docker image!*
@@ -163,21 +179,21 @@ NB: To be able to sign packages the user running the docker command for generati
 # Update the brew formula for ceylon
 
 1. Fork it on https://github.com/Homebrew/homebrew-core
-2. Update the file [`Library/Formula/ceylon.rb`](https://github.com/Homebrew/homebrew-core/blob/master/Formula/ceylon.rb)
+2. Update the file [`Formula/ceylon.rb`](https://github.com/Homebrew/homebrew-core/blob/master/Formula/ceylon.rb)
 3. Make a pull-request
 
 # Update the SDKMAN candidate
 
 This is done via simple `curl` commands, but requires a key and token that will not be posted here for security reasons.
 
-1. First, release the candidate with `curl -X POST -H "consumer_key: KKKKKKK" -H "consumer_token: TTTTTT" -H "Content-Type: application/json" -H "Accept: application/json" -d '{"candidate":"ceylon","version":"<release version>","url":"https://downloads.ceylon-lang.org/cli/ceylon-<release version>.zip"}' https://vendors.sdkman.io/release`. This should return something like `{"status":201,"id":"XXXXX","message":"released ceylon version: <release version>"}`
-2. Next, set the new version as default with `curl -X PUT -H "consumer_key: KKKKKKKK" -H "consumer_token: TTTTTTTT" -H "Content-Type: application/json" -H "Accept: application/json" -d '{"candidate":"ceylon","default":"<release version>"}' https://vendors.sdkman.io/default`. This should return something like `{"status":202,"id":"XXXXXXXX","message":"default ceylon version: <release version>"}`
+1. First, release the candidate with `curl -X POST -H "consumer_key: KKKKKKK" -H "consumer_token: TTTTTT" -H "Content-Type: application/json" -H "Accept: application/json" -d '{"candidate":"ceylon","version":"${RELVER}>","url":"https://downloads.ceylon-lang.org/cli/ceylon-${RELVER}.zip"}' https://vendors.sdkman.io/release`. This should return something like `{"status":201,"id":"XXXXX","message":"released ceylon version: <release version>"}`
+2. Next, set the new version as default with `curl -X PUT -H "consumer_key: KKKKKKKK" -H "consumer_token: TTTTTTTT" -H "Content-Type: application/json" -H "Accept: application/json" -d '{"candidate":"ceylon","default":"${RELVER}"}' https://vendors.sdkman.io/default`. This should return something like `{"status":202,"id":"XXXXXXXX","message":"default ceylon version: <release version>"}`
 3. Finally, to broadcast an announcement of the new release: `curl -X POST -H "consumer_key: KKKKKKKK" -H "consumer_token: TTTTTTTT" -H "Content-Type: application/json" -H "Accept: application/json" -d '{"candidate": "ceylon", "version": "<release version>", "hashtag": "ceylonlang"}' https://vendors.sdkman.io/announce/struct`
 
 You can now also use the `dist/sdkman.sh` script ot do the same:
 
-1. `sdkman candidate 1.2.1 KKKKK TTTTTT` will do the same as first two steps above: register a new version and set it as the default
-1. `sdkman announce 1.2.1 KKKKK TTTTTT` will do the same as the last step: announce the new version
+1. `sdkman candidate ${RELVER} KKKKK TTTTTT` will do the same as first two steps above: register a new version and set it as the default
+1. `sdkman announce ${RELVER} KKKKK TTTTTT` will do the same as the last step: announce the new version
 
 # ArchLinux
 
@@ -196,6 +212,7 @@ Alex Szczuczko (aszczucz _AHT_ redhat _DOWT_ com).
 # Update the Web IDE
 
  - [ceylon-web-ide-backend](https://github.com/ceylon/ceylon-web-ide-backend)
+ - DOn't forget to update the Ceylon Bootstrap files! (`ceylon bootstrap --force`)
 
 # Update Maven support
 

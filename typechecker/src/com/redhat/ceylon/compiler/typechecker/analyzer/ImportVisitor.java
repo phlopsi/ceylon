@@ -73,7 +73,8 @@ public class ImportVisitor extends Visitor {
             if (ip!=null) {
                 String mp = formatPath(ip.getIdentifiers());
                 if (!set.add(mp)) {
-                    ip.addError("duplicate import: '" + mp + "'");
+                    ip.addError("duplicate import: package '" 
+                            + mp + "' is already imported");
                 }
             }
         }
@@ -90,24 +91,26 @@ public class ImportVisitor extends Visitor {
             return;
         }
         
+        Tree.ImportPath path = that.getImportPath();
         Package importedPackage = 
-                importedPackage(that.getImportPath(), unit);
+                importedPackage(path, unit);
         if (importedPackage!=null) {
-            that.getImportPath().setModel(importedPackage);
+            path.setModel(importedPackage);
             Tree.ImportMemberOrTypeList imtl = 
                     that.getImportMemberOrTypeList();
             if (imtl!=null) {
                 ImportList il = imtl.getImportList();
                 il.setImportedScope(importedPackage);
                 Set<String> names = new HashSet<String>();
-                for (Tree.ImportMemberOrType member: 
-                        imtl.getImportMemberOrTypes()) {
+                List<Tree.ImportMemberOrType> list = 
+                        imtl.getImportMemberOrTypes();
+                for (Tree.ImportMemberOrType member: list) {
                     names.add(importMember(member, importedPackage, il));
                 }
                 if (imtl.getImportWildcard()!=null) {
                     importAllMembers(importedPackage, names, il);
                 } 
-                else if (imtl.getImportMemberOrTypes().isEmpty()) {
+                else if (list.isEmpty()) {
                     imtl.addError("empty import list", 1020);
                 }
             }
@@ -331,27 +334,24 @@ public class ImportVisitor extends Visitor {
             i.setAlias(al);
         }
         if (isNonimportable(importedPackage, name)) {
-            id.addError("root type may not be imported: '" +
-                    name + "' in '" + 
-                    importedPackage.getNameAsString() + 
-                    "' is represented by '" + 
-                    name + "' in 'ceylon.language'");
+            id.addError("root type may not be imported: '" 
+                    + name 
+                    + "' in '" 
+                    + importedPackage.getNameAsString() 
+                    + "' is represented by '" 
+                    + equivalentType(name) 
+                    + "' in 'ceylon.language'");
             return name;
         }        
         Declaration d = 
                 importedPackage.getMember(name, null, false);
         if (d == null) {
-            String newName;
-            if (JvmBackendUtil.isInitialLowerCase(name)) {
-                newName = NamingBase.capitalize(name);
-            }
-            else {
-                newName = NamingBase.getJavaBeanName(name);
-            }
+            String newName = adaptJavaName(name);
             d = importedPackage.getMember(newName, null, false);
             // only do this for Java declarations we fudge
-            if(d != null && !d.isJava())
+            if (d!=null && !d.isJava()) {
                 d = null;
+            }
         }
         if (d==null) {
             id.addError("imported declaration not found: '" 
@@ -364,17 +364,21 @@ public class ImportVisitor extends Visitor {
         else {
             if (!declaredInPackage(d, unit)) {
                 if (!d.isShared()) {
-                    id.addError("imported declaration is not shared: '" +
-                            name + "'", 
+                    id.addError("imported declaration is not visible: '" +
+                            name + "' is not shared", 
                             400);
                 }
+                else if (!d.withinRestrictions(unit)) {
+                    id.addError("imported declaration is not visible: '" +
+                            name + "' is restricted");
+                }
                 else if (d.isPackageVisibility()) {
-                    id.addError("imported package private declaration is not visible: '" +
-                            name + "'");
+                    id.addError("imported declaration is not visible: '" +
+                            name + "' is package private");
                 }
                 else if (d.isProtectedVisibility()) {
-                    id.addError("imported protected declaration is not visible: '" +
-                            name + "'");
+                    id.addError("imported declaration is not visible: '" +
+                            name + "' is protected");
                 }
             }
             i.setDeclaration(d);
@@ -412,13 +416,7 @@ public class ImportVisitor extends Visitor {
         }
         Declaration m = td.getMember(name, null, false);
         if (m == null && td.isJava()) {
-            String newName;
-            if (JvmBackendUtil.isInitialLowerCase(name)) {
-                newName = NamingBase.capitalize(name);
-            }
-            else {
-                newName = NamingBase.getJavaBeanName(name);
-            }
+            String newName = adaptJavaName(name);
             m = td.getMember(newName, null, false);
         }
         if (m==null) {
@@ -448,21 +446,28 @@ public class ImportVisitor extends Visitor {
                 }
             }
             if (!m.isShared()) {
-                id.addError("imported declaration is not shared: '" +
+                id.addError("imported declaration is not visible: '" +
                         name + "' of '" + 
                         td.getName() + 
                         "' is not shared", 
                         400);
             }
+            else if (!m.withinRestrictions(unit)) {
+                id.addError("imported declaration is not visible: '" +
+                        name + "' of '" + 
+                        td.getName() + 
+                        "' is restricted", 
+                        400);
+            }
             else if (!declaredInPackage(m, unit)) {
                 if (m.isPackageVisibility()) {
-                    id.addError("imported package private declaration is not visible: '" +
+                    id.addError("imported declaration is not visible: '" +
                             name + "' of '" + 
                             td.getName() + 
                             "' is package private");
                 }
                 else if (m.isProtectedVisibility()) {
-                    id.addError("imported protected declaration is not visible: '" +
+                    id.addError("imported declaration is not visible: '" +
                             name + "' of '" + 
                             td.getName() + 
                             "' is protected");
@@ -519,12 +524,17 @@ public class ImportVisitor extends Visitor {
         //imtl.addError("member aliases may not have member aliases");
         return name;
     }
+
+    private static String adaptJavaName(String name) {
+        return JvmBackendUtil.isInitialLowerCase(name) ? 
+                NamingBase.capitalize(name) : 
+                NamingBase.getJavaBeanName(name);
+    }
     
     private boolean isStaticNonGeneric(Declaration dec, 
             TypeDeclaration outer) {
         return dec.isStatic() 
-                && (outer.isJava() || 
-                    outer.getTypeParameters().isEmpty()); 
+            && (outer.isJava() || !outer.isParameterized()); 
     }
 
     private void addImport(Tree.ImportMemberOrType member, 
@@ -581,11 +591,17 @@ public class ImportVisitor extends Visitor {
     private boolean isNonimportable(Package pkg, String name) {
         String pname = pkg.getQualifiedNameString();
         return pname.equals("java.lang")
-                && ("Object".equals(name) ||
-                    "Throwable".equals(name) ||
-                    "Exception".equals(name)) ||
-               pname.equals("java.lang.annotation")
+                && ("Object".equals(name) 
+                 || "Throwable".equals(name) 
+                 || "RuntimeException".equals(name) 
+                 || "Exception".equals(name)) 
+            || pname.equals("java.lang.annotation")
                 && "Annotation".equals(name);
+    }
+    
+    private String equivalentType(String name) {
+        return "RuntimeException".equals(name) ? 
+                "Exception" : name;
     }
     
 }

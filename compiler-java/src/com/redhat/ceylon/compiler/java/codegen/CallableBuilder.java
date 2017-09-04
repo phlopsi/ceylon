@@ -56,6 +56,7 @@ import com.redhat.ceylon.model.typechecker.model.Function;
 import com.redhat.ceylon.model.typechecker.model.FunctionOrValue;
 import com.redhat.ceylon.model.typechecker.model.Functional;
 import com.redhat.ceylon.model.typechecker.model.Interface;
+import com.redhat.ceylon.model.typechecker.model.ModelUtil;
 import com.redhat.ceylon.model.typechecker.model.Parameter;
 import com.redhat.ceylon.model.typechecker.model.ParameterList;
 import com.redhat.ceylon.model.typechecker.model.Reference;
@@ -213,10 +214,11 @@ public class CallableBuilder {
                         primaryType = gen.typeFact().getOptionalType(primaryType);
                     }
                     JCExpression primaryExpr = gen.expressionGen().transformQualifiedMemberPrimary(qmte);
+                    Declaration dec = qmte.getDeclaration();
                     if (Decl.isPrivateAccessRequiringCompanion(qmte)) {
-                        primaryExpr = gen.naming.makeCompanionAccessorCall(primaryExpr, (Interface)qmte.getDeclaration().getContainer());
+                        primaryExpr = gen.naming.makeCompanionAccessorCall(primaryExpr, (Interface)dec.getContainer());
                     }
-                    Type varType = qmte.getDeclaration().isShared() ? primaryType : Decl.getPrivateAccessType(qmte);
+                    Type varType = dec.isShared() ? primaryType : Decl.getPrivateAccessType(qmte);
                     
                     if (qmte.getPrimary().getUnboxed() == false) {
                         varTypeFlags |= JT_NO_PRIMITIVES;
@@ -339,8 +341,8 @@ public class CallableBuilder {
         final ParameterList parameterList = methodClassOrCtor.getFirstParameterList();
         Type type = typeModel;
         JCExpression target;
-        boolean memberClassCtorRef = Decl.getConstructor((Declaration)methodClassOrCtor) != null
-                && !Decl.getConstructedClass((Declaration)methodClassOrCtor).isToplevel()
+        boolean memberClassCtorRef = ModelUtil.getConstructor((Declaration)methodClassOrCtor) != null
+                && !ModelUtil.getConstructedClass((Declaration)methodClassOrCtor).isToplevel()
                 && qmte.getPrimary() instanceof Tree.QualifiedTypeExpression
                 ;
         boolean hasOuter = !(Decl.isConstructor((Declaration)methodClassOrCtor)
@@ -367,8 +369,8 @@ public class CallableBuilder {
         Type accessType = gen.getParameterTypeOfCallable(typeModel, 0);
         boolean needsCast = false;
         if (Decl.isConstructor((Declaration)methodClassOrCtor)) {
-            Constructor ctor = Decl.getConstructor((Declaration)methodClassOrCtor);
-            Class cls = Decl.getConstructedClass(ctor);
+            Constructor ctor = ModelUtil.getConstructor((Declaration)methodClassOrCtor);
+            Class cls = ModelUtil.getConstructedClass(ctor);
             if (Strategy.generateInstantiator(ctor)) {
                 needsCast = Strategy.isInstantiatorUntyped(ctor);
                 callBuilder.invoke(gen.naming.makeInstantiatorMethodName(target, cls));
@@ -413,10 +415,10 @@ public class CallableBuilder {
         }
         
         if (Decl.isConstructor((Declaration)methodClassOrCtor)
-                && !Decl.isDefaultConstructor(Decl.getConstructor((Declaration)methodClassOrCtor))
+                && !Decl.isDefaultConstructor(ModelUtil.getConstructor((Declaration)methodClassOrCtor))
                 && !Decl.isJavaArrayWith((Constructor)methodClassOrCtor)) {
             // invoke the param class ctor
-            Constructor ctor = Decl.getConstructor((Declaration)methodClassOrCtor);
+            Constructor ctor = ModelUtil.getConstructor((Declaration)methodClassOrCtor);
             callBuilder.argument(gen.naming.makeNamedConstructorName(ctor, false));
         }
         for (Parameter parameter : parameterList.getParameters()) {
@@ -481,9 +483,9 @@ public class CallableBuilder {
     }
     
     class MemberReferenceDefaultValueCall implements DefaultValueMethodTransformation {
-        private Functional methodOrClass;
+//        private Functional methodOrClass;
         MemberReferenceDefaultValueCall(final Functional methodOrClass) {
-            this.methodOrClass = methodOrClass;
+//            this.methodOrClass = methodOrClass;
         }
         @Override
         public JCExpression makeDefaultValueMethod(AbstractTransformer gen, Parameter defaultedParam, List<JCExpression> defaultMethodArgs) {
@@ -1175,7 +1177,8 @@ public class CallableBuilder {
                     paramType = gen.typeFact().getObjectType();
                 }
                 long flags = Flags.FINAL;
-                JCExpression javaType = gen.makeJavaType(paramType, 0);
+                // that looks fishy, perhaps we need to call non-widening rules instead
+                JCExpression javaType = gen.makeJavaType(paramType, paramType.isRaw() ? AbstractTransformer.JT_RAW : 0);
                 if(param.isSequenced()){
                     flags |= Flags.VARARGS;
                     javaType = gen.make().TypeArray(javaType);
@@ -1194,11 +1197,20 @@ public class CallableBuilder {
                             && !targetParam.getModel().hasUncheckedNullType()){
                         arg = gen.utilInvocation().checkNull(arg);
                     }
-                    if(CodegenUtil.isUnBoxed(param.getModel())){
-                        arg = gen.expressionGen().applyErasureAndBoxing(arg, paramType, 
-                                false, BoxingStrategy.BOXED,
-                                argumentType);
-                    }
+                    Type simpleParamType = gen.simplifyType(paramType);
+                    // make unboxed java strings pass for ceylon strings so we can box them
+                    boolean unboxedString = gen.isJavaStringExactly(simpleParamType);
+                    if(unboxedString)
+                        simpleParamType = gen.typeFact().getStringType();
+                    BoxingStrategy boxingStrategy = BoxingStrategy.BOXED;
+                    // in rare cases we don't want boxes
+                    if(unboxedString && gen.isJavaStringExactly(argumentType))
+                        boxingStrategy = BoxingStrategy.UNBOXED;
+                    arg = gen.expressionGen().applyErasureAndBoxing(arg, simpleParamType, 
+                            !(CodegenUtil.isUnBoxed(param.getModel())
+                                    || unboxedString), 
+                            boxingStrategy,
+                            argumentType);
                 }
                 args.append(arg);
                 index++;
@@ -1226,6 +1238,13 @@ public class CallableBuilder {
                         callableReturnType, 
                         true, 
                         BoxingStrategy.UNBOXED,
+                        returnType);
+            }else if(callableReturnType.isNull()){
+                // if the callable returns null and the SAM does not, we need a cast
+                call = gen.expressionGen().applyErasureAndBoxing(call, 
+                        callableReturnType, 
+                        true, 
+                        BoxingStrategy.INDIFFERENT,
                         returnType);
             }
             body = gen.make().Return(call);

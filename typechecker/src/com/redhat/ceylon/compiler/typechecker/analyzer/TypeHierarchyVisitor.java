@@ -25,6 +25,7 @@ import com.redhat.ceylon.compiler.typechecker.tree.Visitor;
 import com.redhat.ceylon.model.typechecker.model.Class;
 import com.redhat.ceylon.model.typechecker.model.ClassOrInterface;
 import com.redhat.ceylon.model.typechecker.model.Declaration;
+import com.redhat.ceylon.model.typechecker.model.Function;
 import com.redhat.ceylon.model.typechecker.model.FunctionOrValue;
 import com.redhat.ceylon.model.typechecker.model.Functional;
 import com.redhat.ceylon.model.typechecker.model.Interface;
@@ -103,10 +104,9 @@ public class TypeHierarchyVisitor extends Visitor {
     
     @Override
     public void visit(Tree.ObjectDefinition that) {
+        super.visit(that);
         Value value = that.getDeclarationModel();
         Class anonymousClass = that.getAnonymousClass();
-        validateMemberRefinement(that, anonymousClass);
-        super.visit(that);
         //an object definition is always concrete
         List<Type> orderedTypes = 
                 sortDAGAndBuildMetadata(value.getTypeDeclaration(), that);
@@ -116,13 +116,13 @@ public class TypeHierarchyVisitor extends Visitor {
                 orderedTypes, anonymousClass);
         checkForDoubleMemberInheritanceWoCommonAncestor(that, 
                 orderedTypes, anonymousClass);
+        validateMemberRefinement(that, anonymousClass);
     }
 
     @Override
     public void visit(Tree.ObjectArgument that) {
-        Class anonymousClass = that.getAnonymousClass();
-        validateMemberRefinement(that, anonymousClass);
         super.visit(that);
+        Class anonymousClass = that.getAnonymousClass();
         //an object definition is always concrete
         List<Type> orderedTypes = 
                 sortDAGAndBuildMetadata(anonymousClass, that);
@@ -132,13 +132,13 @@ public class TypeHierarchyVisitor extends Visitor {
                 orderedTypes, anonymousClass);
         checkForDoubleMemberInheritanceWoCommonAncestor(that, 
                 orderedTypes, anonymousClass);
+        validateMemberRefinement(that, anonymousClass);
     }
 
     @Override
     public void visit(Tree.ObjectExpression that) {
-        Class anonymousClass = that.getAnonymousClass();
-        validateMemberRefinement(that, anonymousClass);
         super.visit(that);
+        Class anonymousClass = that.getAnonymousClass();
         //an object definition is always concrete
         List<Type> orderedTypes = 
                 sortDAGAndBuildMetadata(anonymousClass, that);
@@ -148,13 +148,14 @@ public class TypeHierarchyVisitor extends Visitor {
                 orderedTypes, anonymousClass);
         checkForDoubleMemberInheritanceWoCommonAncestor(that, 
                 orderedTypes, anonymousClass);
+        validateMemberRefinement(that, anonymousClass);
     }
 
     @Override
     public void visit(Tree.ClassOrInterface that) {
-        ClassOrInterface classOrInterface = that.getDeclarationModel();
-        validateMemberRefinement(that, classOrInterface);
         super.visit(that);
+        ClassOrInterface classOrInterface = 
+                that.getDeclarationModel();
         if (!classOrInterface.isAlias()) {
             boolean concrete = 
                     !classOrInterface.isAbstract() && 
@@ -170,6 +171,7 @@ public class TypeHierarchyVisitor extends Visitor {
             checkForDoubleMemberInheritanceWoCommonAncestor(that, 
                     orderedTypes, classOrInterface);
         }
+        validateMemberRefinement(that, classOrInterface);
     }
 
     @Override
@@ -238,9 +240,14 @@ public class TypeHierarchyVisitor extends Visitor {
                                     getTypeDeclarationFor(aggregateMembers);
                             if (!mixedInBySupertype(currentType.declaration, 
                                     otherType, classOrInterface)) {
-                                StringBuilder sb = new StringBuilder("may not inherit two declarations with the same name that do not share a common supertype: '");
-                                sb.append(name)
-                                  .append("' is defined by supertypes '")
+                                StringBuilder sb = new StringBuilder();
+                                sb.append("type '")
+                                  .append(classOrInterface.getName())
+                                  .append("' inherits multiple definitions of '")
+                                  .append(name)
+                                  .append("': inherited member '")
+                                  .append(name)
+                                  .append("' is defined by unrelated supertypes '")
                                   .append(currentType.declaration.getName())
                                   .append("' and '")
                                   .append(otherType.getName())
@@ -288,14 +295,23 @@ public class TypeHierarchyVisitor extends Visitor {
                                     getTypeDeclarationFor(aggregateMembers);
                             if (!mixedInBySupertype(currentType.declaration, 
                                     otherType, classOrInterface)) {
-                                StringBuilder sb = new StringBuilder("may not inherit two declarations with the same name unless redefined in subclass: '");
-                                sb.append(name)
+                                StringBuilder sb = new StringBuilder();
+                                sb.append("type '")
+                                  .append(classOrInterface.getName())
+                                  .append("' inherits but does not refine multiple definitions of '")
+                                  .append(name)
+                                  .append("': inherited member '")
+                                  .append(name)
                                   .append("' is defined by supertypes '")
                                   .append(currentType.declaration.getName())
                                   .append("' and '")
                                   .append(otherType.getName())
-                                  .append("'");
-                                that.addError(sb.toString());
+                                  .append("' (refine '")
+                                  .append(name)
+                                  .append("' in '")
+                                  .append(classOrInterface.getName())
+                                  .append("')");
+                                that.addError(sb.toString(), 350);
                             }
                         }
                     }
@@ -348,18 +364,19 @@ public class TypeHierarchyVisitor extends Visitor {
 
     private boolean isMemberRefined(List<Type> orderedTypes, int index, 
             String name, Type.Members currentTypeMembers) {
-        int size = orderedTypes.size();
         Declaration declarationOfSupertypeMember = 
                 getMemberDeclaration(currentTypeMembers);
-        for (int subIndex = size-1 ; subIndex>index;subIndex--) {
+        for (int subIndex = orderedTypes.size()-1; 
+                subIndex>index; subIndex--) {
             Type type = orderedTypes.get(subIndex);
             //has a direct member and supertype as inherited members
             Declaration directMember = 
                     type.declaration.getDirectMember(name, null, false);
             boolean isMemberRefined = 
-                    directMember!=null && directMember.isShared(); //&& !(directMember instanceof Parameter);
-            isMemberRefined = isMemberRefined && 
-                    type.declaration.getInheritedMembers(name)
+                    directMember!=null && 
+                    directMember.isShared() && 
+                    type.declaration
+                        .getInheritedMembers(name)
                         .contains(declarationOfSupertypeMember);
             if (isMemberRefined) {
                 return true;
@@ -391,6 +408,14 @@ public class TypeHierarchyVisitor extends Visitor {
         return null;
     }
 
+    private boolean isJavaSetter(Declaration dec) {
+        return dec instanceof Function
+            && dec.isJava()
+            && dec.getName().matches("set[A-Z0-9].*")
+            && ((Function)dec).isDeclaredVoid()
+            && ((Function)dec).getFirstParameterList().getParameters().size() == 1;
+    }
+
     private void checkForFormalsNotImplemented(Node that, 
             List<Type> orderedTypes, Class clazz) {
         Type aggregation = buildAggregatedType(orderedTypes);
@@ -403,8 +428,19 @@ public class TypeHierarchyVisitor extends Visitor {
                             (Declaration)
                                 example.getContainer();
                     if (!clazz.equals(declaringType)) {
-                        addUnimplementedFormal(clazz, example);
                         String name = example.getName();
+                        if (isJavaSetter(example) 
+                                && aggregation.membersByName
+                                    .containsKey(setterToProperty(name))) {
+                            //we need to ignore setters that are
+                            //refined by get/set pairs lower down
+                            //the Java hierarchy
+                            //TODO: add the concept of write-only
+                            //      properties to the typechecker
+                            //      (i.e. a setter with no getter)
+                            continue;
+                         }
+                        addUnimplementedFormal(clazz, example);
                         that.addError("formal member '"
                                 + name + "' of '"
                                 + declaringType.getName()
@@ -464,9 +500,14 @@ public class TypeHierarchyVisitor extends Visitor {
         }
     }
 
+    private static String setterToProperty(String name) {
+        return name.substring(3, 4).toLowerCase() 
+            + name.substring(4);
+    }
+
     private static boolean isJavaInterfaceMember(Declaration formal) {
         return formal.isInterfaceMember() 
-                && formal.isJava();
+            && formal.isJava();
     }
 
     private void addUnimplementedFormal(Class clazz, Declaration member) {
@@ -484,9 +525,9 @@ public class TypeHierarchyVisitor extends Visitor {
 
     //accumulate all members of a type hierarchy
     private Type buildAggregatedType(List<Type> orderedTypes) {
-        int size = orderedTypes.size();
         Type aggregation = new Type();
-        for (int index = size-1; index>=0; index--) {
+        for (int index = orderedTypes.size()-1; 
+                index>=0; index--) {
             Type current = orderedTypes.get(index);
             for (Type.Members currentMembers:
                     current.membersByName.values()) {
@@ -545,16 +586,17 @@ public class TypeHierarchyVisitor extends Visitor {
             List<com.redhat.ceylon.model.typechecker.model.Type> signature, 
             boolean variadic, Declaration concrete) {
         return formal.getName().equals(concrete.getName())
-                && isDefinedInJava(concrete)
-                && (!overloaded || hasMatchingSignature(concrete, signature, variadic));
+            && isDefinedInJava(concrete)
+            && (!overloaded || hasMatchingSignature(concrete, signature, variadic));
     }
 
     //sort type hierarchy from most abstract to most concrete
     private List<Type> sortDAGAndBuildMetadata(TypeDeclaration declaration, 
             Node errorReporter) {
-        //Apply a partial sort on the class hierarchy which is a Directed Acyclic Graph (DAG)
-        // with subclasses pointing to superclasses or interfaces
-        //use depth-first plus a stack fo processed nodes to detect non DAG
+        //Apply a partial sort on the class hierarchy which is a 
+        //Directed Acyclic Graph (DAG) with subclasses pointing to 
+        //superclasses or interfaces use depth-first plus a stack to 
+        //processed nodes to detect non DAG
         //http://en.wikipedia.org/wiki/Topological_sorting
         List<Type> sortedDag = new ArrayList<Type>();
         List<TypeDeclaration> visitedDeclarationPerBranch = 
@@ -693,63 +735,57 @@ public class TypeHierarchyVisitor extends Visitor {
     
     private void validateMemberRefinement(Node that, 
             TypeDeclaration td) {
-        if (!td.isInconsistentType()) {
+        if (!td.isInconsistentType() 
+                && td instanceof ClassOrInterface 
+                && !td.isAbstract() 
+                && !td.isAlias()
+                //The work here dupes some checks 
+                //that are already done above in 
+                //checkForDoubleMemberInheritance, 
+                //resulting in multiple errors
+                && !that.hasErrors()) {
             Set<String> errors = new HashSet<String>();
             for (TypeDeclaration std: 
                     td.getSupertypeDeclarations()) {
-                if (td instanceof ClassOrInterface && 
-                        !td.isAbstract() && !td.isAlias()) {
-                    for (Declaration d: std.getMembers()) {
-                        if (d.isShared() && 
-                                !d.isStatic() &&
-                                !isConstructor(d) &&
-                                !isOverloadedVersion(d) && 
-                                isResolvable(d) && 
-                                !errors.contains(d.getName())) {
-                            Declaration r = td.getMember(d.getName(), null, false);
-                            if (r==null || !r.refines(d) && 
-                                    //squash bogus error when there is a dupe declaration
-                                    !r.getContainer().equals(td)) {
-                                //TODO: This seems to dupe some checks that are already 
-                                //      done in TypeHierarchyVisitor, resulting in
-                                //      multiple errors
-                                //TODO: figure out which other declaration causes the
-                                //      problem and display it to the user!
-                                if (r==null) {
-                                    that.addError("member '" + d.getName() +
-                                            "' is inherited ambiguously by '" + td.getName() +
-                                            "' from '" + std.getName() +  
-                                            "' and another unrelated supertype");
-                                }
-                                else if (!((std instanceof Interface 
-                                            || r.isInterfaceMember()) && 
-                                          isDefinedInJava(std) &&
-                                          isDefinedInJava(r))) {
-                                    that.addError("member '" + d.getName() + 
-                                            "' is inherited ambiguously by '" + td.getName() +
-                                            "' from '" + std.getName() +  
-                                            "' and another subtype of '" + 
-                                            ((TypeDeclaration) r.getContainer()).getName() + 
-                                            "' and so must be refined by '" + td.getName() + "'", 
-                                            350);
-                                }
-                                errors.add(d.getName());
-                            }
-                            /*else if (!r.getContainer().equals(td)) { //the case where the member is actually declared by the current type is handled by checkRefinedTypeAndParameterTypes()
-                                //TODO: I think this case never occurs, because getMember() always
-                                //      returns null in the case of an ambiguity
-                                List<Type> typeArgs = new ArrayList<Type>();
-                                if (d instanceof Generic) {
-                                    for (TypeParameter refinedTypeParam: ((Generic) d).getTypeParameters()) {
-                                        typeArgs.add(refinedTypeParam.getType());
-                                    }
-                                }
-                                Type t = td.getType().getTypedReference(r, typeArgs).getType();
-                                Type it = st.getTypedReference(d, typeArgs).getType();
-                                checkAssignable(t, it, that, "type of member " + d.getName() + 
-                                        " must be assignable to all types inherited from instantiations of " +
-                                        st.getDeclaration().getName());
-                            }*/
+                for (Declaration d: std.getMembers()) {
+                    if (d.isShared() 
+                            && !d.isStatic() 
+                            && !isConstructor(d) 
+                            && !isOverloadedVersion(d) 
+                            && isResolvable(d) 
+                            && !errors.contains(d.getName())) {
+                        Declaration r = td.getMember(d.getName(), null, false);
+                        //TODO: figure out which other declaration 
+                        //      causes the problem and display it 
+                        //      to the user!
+                        if (r!=null && !r.refines(d) && 
+                                //squash bogus error when there 
+                                //is a dupe declaration
+                                !r.getContainer().equals(td) &&
+                                !((std instanceof Interface 
+                                    || r.isInterfaceMember()) && 
+                                  isDefinedInJava(std) &&
+                                  isDefinedInJava(r))) {
+                            TypeDeclaration ctd = 
+                                    (TypeDeclaration) 
+                                        r.getContainer();
+                            that.addError("member '" 
+                                    + d.getName() 
+                                    + "' is inherited ambiguously by '" 
+                                    + td.getName() 
+                                    + "' from '" 
+                                    + std.getName()
+                                    + "' and a different generic instantiation of '"
+                                    + ctd.getName() 
+                                    + "' and is not refined by '" 
+                                    + td.getName() 
+                                    + "' (refine '"
+                                    + d.getName() 
+                                    + "' to satisfy both instantiations of '"
+                                    + ctd.getName() 
+                                    + "')", 
+                                    350);
+                            errors.add(d.getName());
                         }
                     }
                 }
@@ -763,7 +799,9 @@ public class TypeHierarchyVisitor extends Visitor {
         }
         else {
             Declaration rd = d.getRefinedDeclaration();
-            return rd!=null && !rd.equals(d) && isDefinedInJava(rd);
+            return rd!=null 
+                && !rd.equals(d) 
+                && isDefinedInJava(rd);
         }
     }
 

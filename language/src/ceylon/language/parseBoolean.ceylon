@@ -4,11 +4,16 @@
  
  Recognized values are `\"true\"`, `\"false\"`."
 tagged("Basic types")
-deprecated("Use [[Boolean.parse]]")
-see (`function Boolean.parse`)
-shared Boolean? parseBoolean(String string) {
-    switch (string)
-    case ("true") { return true; }
-    case ("false") { return false; }
-    else { return null; }
-}
+see (function Boolean.parse)
+shared Boolean? parseBoolean(String? string) 
+        => if (exists string,
+               is Boolean result
+                   = parseBooleanInternal(string))
+        then result
+        else null;
+
+Boolean|ParseException parseBooleanInternal(String string)
+        => switch (string)
+        case ("true") true
+        case ("false") false
+        else ParseException("illegal format for Boolean");

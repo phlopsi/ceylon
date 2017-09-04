@@ -54,7 +54,7 @@ import com.redhat.ceylon.model.cmr.ModuleScope;
 public class AetherTestCase extends AbstractAetherTest {
     @Test
     public void testSimpleTest() throws Throwable {
-        StructureBuilder structureBuilder = new AetherContentStore(log, null, false, 60000, new File("").getAbsolutePath());
+        StructureBuilder structureBuilder = new AetherContentStore(log, null, null, false, 60000, new File("").getAbsolutePath());
         CmrRepository repository = MavenRepositoryHelper.getMavenRepository(structureBuilder);
         RepositoryManager manager = new SimpleRepositoryManager(repository, log);
         File artifact = manager.getArtifact(MavenArtifactContext.NAMESPACE, "org.slf4j:slf4j-api", "1.6.4");
@@ -365,7 +365,7 @@ public class AetherTestCase extends AbstractAetherTest {
     public void testOptionalDependency() throws Throwable {
         Repository repository = AetherRepository.createRepository(log, false, 60000);
         RepositoryManager manager = new SimpleRepositoryManager(repository, log);
-        ArtifactResult result = manager.getArtifactResult("com.google.guava:guava", "18.0");
+        ArtifactResult result = manager.getArtifactResult("com.google.guava:guava", "20.0");
         Assert.assertNotNull(result);
         Assert.assertEquals(result.name(), "com.google.guava:guava");
         File artifact = result.artifact();

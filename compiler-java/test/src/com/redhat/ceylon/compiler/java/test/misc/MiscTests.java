@@ -117,7 +117,7 @@ public class MiscTests extends CompilerTests {
             }   
         };
         String[] extras = new String[]{
-        		"true", "false"
+        		"true", "false", "arrayToTuple"
         };
         String[] modelExtras = new String[]{
                 "classDeclaration", "annotations", "modules", "type", "typeLiteral"
@@ -286,6 +286,8 @@ public class MiscTests extends CompilerTests {
                 "http.common",
                 "http.server",
                 "interop.java",
+                "interop.persistence",
+                "interop.spring",
                 "io",
                 "json",
                 "locale",
@@ -351,7 +353,6 @@ public class MiscTests extends CompilerTests {
                 Arrays.asList("-sourcepath", sourceDir, "-d", "build/classes-sdk",
                         "-sysrep", getSysRepPath(),
                         "-suppress-warnings", "ceylonNamespace",
-                        "-overrides", "../../ceylon-sdk/overrides.xml",
                         "-cp", getClassPathAsPath()), 
                         moduleNames, null);
         Boolean result = task.call();

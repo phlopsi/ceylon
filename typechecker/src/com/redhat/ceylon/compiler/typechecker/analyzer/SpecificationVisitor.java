@@ -9,6 +9,7 @@ import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.isNev
 import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.message;
 import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.isEffectivelyBaseMemberExpression;
 import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.isSelfReference;
+import static com.redhat.ceylon.model.typechecker.model.ModelUtil.getContainingClassOrInterface;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.isConstructor;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.isNativeHeader;
 
@@ -17,6 +18,7 @@ import java.util.List;
 
 import com.redhat.ceylon.compiler.typechecker.tree.Node;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree;
+import com.redhat.ceylon.compiler.typechecker.tree.Tree.Term;
 import com.redhat.ceylon.compiler.typechecker.tree.Visitor;
 import com.redhat.ceylon.model.typechecker.model.Class;
 import com.redhat.ceylon.model.typechecker.model.ClassOrInterface;
@@ -58,8 +60,9 @@ public class SpecificationVisitor extends Visitor {
     private boolean endsInReturnThrow = false;
     private boolean endsInBreak = false;
     private boolean inExtends = false;
+    private boolean inParameter = false;
     private boolean inDelegatedContructor = false;
-    private boolean inAnonFunctionOrComprehension = false;
+    private boolean inLazyExpression = false;
     private Parameter parameter = null;
     private boolean usedInDeclarationSection = false;
     private boolean definedInDeclarationSection = false;
@@ -132,7 +135,8 @@ public class SpecificationVisitor extends Visitor {
     private boolean isVariable() {
         if (declaration instanceof TypedDeclaration) {
             TypedDeclaration td = 
-                    (TypedDeclaration) declaration;
+                    (TypedDeclaration) 
+                        declaration;
             return td.isVariable();
         }
         else {
@@ -143,7 +147,8 @@ public class SpecificationVisitor extends Visitor {
     private boolean isLate() {
         if (declaration instanceof FunctionOrValue) {
             FunctionOrValue fov = 
-                    (FunctionOrValue) declaration;
+                    (FunctionOrValue) 
+                        declaration;
             return fov.isLate();
         }
         else {
@@ -179,8 +184,19 @@ public class SpecificationVisitor extends Visitor {
     }
     
     @Override
+    public void visit(Tree.TypeConstraint that) {
+        //the SatisfiedTypes are just upper bounds
+    }
+    
+    @Override
     public void visit(Tree.SatisfiedTypes that) {
-        //unnecessary ... for consistency nothing else
+        for (Tree.Type type: that.getTypes()) {
+            if (type instanceof Tree.SimpleType) {
+                Tree.SimpleType st = (Tree.SimpleType) type;
+                checkReference(type, st.getDeclarationModel(), 
+                        false, false);
+            }
+        }
     }
     
     @Override
@@ -227,7 +243,8 @@ public class SpecificationVisitor extends Visitor {
                     (Tree.MemberOrTypeExpression) that;
             if (that instanceof Tree.BaseTypeExpression || 
                     that instanceof Tree.QualifiedTypeExpression) {
-                if (mte.getStaticMethodReferencePrimary()) {
+                if (mte.getStaticMethodReferencePrimary()
+                        && !hasConstructors(mte.getDeclaration())) {
                     return;
                 }
             }
@@ -245,12 +262,17 @@ public class SpecificationVisitor extends Visitor {
             return;
         }
 
+        checkReference(that, member, assigned, metamodel);
+    }
+
+    private void checkReference(Node that, Declaration member, 
+            boolean assigned, boolean metamodel) {
         Scope scope = that.getScope();
-        if ((member==declaration || 
-                isDelegationToDefaultConstructor(member)) && 
-                declaration.isDefinedInScope(scope) &&
+        if ((member==declaration 
+                || isDelegationToDefaultConstructor(member)) 
+                && declaration.isDefinedInScope(scope) 
                 //TODO: THIS IS TERRIBLE!!!!!
-                !isReferenceToNativeHeaderMember(scope)) {
+                && !isReferenceToNativeHeaderMember(scope)) {
             if (!declared) {
                 if (!metamodel && 
                         !isForwardReferenceable() && 
@@ -269,8 +291,8 @@ public class SpecificationVisitor extends Visitor {
                     }
                 }
             }
-            else if (!definitely || 
-                    declaration.isFormal()) {
+            else if (!definitely 
+                    || declaration.isFormal()) {
                 //you are allowed to refer to formal
                 //declarations in a class declaration
                 //section or interface
@@ -281,9 +303,9 @@ public class SpecificationVisitor extends Visitor {
                                 " is declared 'formal'");                    
                     }
                 }
-                else if (!metamodel &&
-                        !isNativeHeader(declaration) &&
-                        !isLate()) {
+                else if (!metamodel 
+                        && !isNativeHeader(declaration) 
+                        && !isLate()) {
                     String message = 
                             "not definitely "
                             + (isVariable() ? 
@@ -301,27 +323,48 @@ public class SpecificationVisitor extends Visitor {
             else if (parameter!=null) {
                 Declaration paramDec =
                         parameter.getDeclaration();
-                if (isConstructor(paramDec) &&
-                        !declaration.isStatic() &&
-                        paramDec.getContainer()
+                if (isConstructor(paramDec) 
+                        && !declaration.isStatic() 
+                        && paramDec.getContainer()
                             .equals(declaration.getContainer())) {
                   that.addError("default argument to constructor parameter is a member of the constructed class");
                }
             }
-            if (!assigned && declaration.isDefault() && 
-                    !isForwardReferenceable()) {
+            if (!assigned 
+                    && declaration.isDefault() 
+                    && !isForwardReferenceable()) {
                 that.addError("default member may not be used in initializer: " + 
                         name() +
                         " is declared 'default'"); 
             }
-            if (inAnonFunctionOrComprehension && 
-                definitely && 
-                isVariable()) {
-                that.addError("member may not be captured by comprehension or function in extends clause: "+
-                        name() +
-                        " is declared 'variable'");
+            if (definitely 
+                    && isVariable() 
+                    && inLazyExpression) {
+                if (inParameter) {
+                    Declaration paramDec =
+                            parameter.getDeclaration();
+                    if (paramDec.equals(declaration.getContainer())) {
+                        that.addError("value may not be captured by lazy expression in default argument: " +
+                                name() +
+                                " is declared 'variable'");
+                    }
+                }
+                if (inExtends) {
+                    if (declaration.isClassOrInterfaceMember()
+                            && getContainingClassOrInterface(scope)
+                                .equals(declaration.getContainer())) {
+                        that.addError("value may not be captured by lazy expression in extends clause: " +
+                                name() +
+                                " is declared 'variable'");
+                    }
+                }
             }
         }
+    }
+
+    private static boolean hasConstructors(Declaration td) {
+        return td instanceof Class 
+            && ((Class) td).hasConstructors();
     }
 
     private boolean isDelegationToDefaultConstructor(Declaration member) {
@@ -335,8 +378,8 @@ public class SpecificationVisitor extends Visitor {
             ClassOrInterface container = 
                     (ClassOrInterface) 
                         declaration.getContainer();
-            return container.isNativeHeader() && 
-                    !scope.getScopedBackends().none();
+            return container.isNativeHeader() 
+                && !scope.getScopedBackends().none();
         }
         else {
             return false;
@@ -468,8 +511,11 @@ public class SpecificationVisitor extends Visitor {
     @Override
     public void visit(Tree.SequenceEnumeration that) {
         boolean odefinitely = definitely;
+        boolean oile = inLazyExpression;
+        inLazyExpression = declared&&(inExtends||inParameter);
         super.visit(that);
         definitely = odefinitely;
+        inLazyExpression = oile;
     }
     
     @Override
@@ -480,27 +526,35 @@ public class SpecificationVisitor extends Visitor {
         Tree.SequencedArgument sa = that.getSequencedArgument();
         if (sa!=null) {
             boolean odefinitely = definitely;
+            boolean oile = inLazyExpression;
+            inLazyExpression = declared&&(inExtends||inParameter);
             sa.visit(this);
             definitely = odefinitely;
+            inLazyExpression = oile;
         }
     }
     
     @Override
     public void visit(Tree.Comprehension that) {
         boolean odefinitely = definitely;
-        boolean oicoaf = inAnonFunctionOrComprehension;
-        inAnonFunctionOrComprehension = declared&&inExtends;
         super.visit(that);
         definitely = odefinitely;
-        inAnonFunctionOrComprehension = oicoaf;
+    }
+    
+    @Override
+    public void visit(Tree.LazySpecifierExpression that) {
+        boolean oile = inLazyExpression;
+        inLazyExpression = declared&&(inExtends||inParameter);
+        super.visit(that);
+        inLazyExpression = oile;
     }
     
     @Override
     public void visit(Tree.FunctionArgument that) {
         boolean c = specificationDisabled;
         specificationDisabled = true;
-        boolean oicoaf = inAnonFunctionOrComprehension;
-        inAnonFunctionOrComprehension = declared&&inExtends;
+        boolean oile = inLazyExpression;
+        inLazyExpression = declared&&(inExtends||inParameter);
         boolean odefinitely = definitely;
         boolean opossibly = possibly;
         boolean opossiblyExited = possiblyExited;
@@ -515,7 +569,7 @@ public class SpecificationVisitor extends Visitor {
         definitelyExited = odefinitelyExited;
         definitelyByLoopBreaks = odefinitelyByLoopBreaks;
         possiblyByLoopBreaks = opossiblyByLoopBreaks;
-        inAnonFunctionOrComprehension = oicoaf;
+        inLazyExpression = oile;
         specificationDisabled = c;
     }
     
@@ -523,8 +577,8 @@ public class SpecificationVisitor extends Visitor {
     public void visit(Tree.ObjectExpression that) {
         boolean c = specificationDisabled;
         specificationDisabled = true;
-        boolean oicoaf = inAnonFunctionOrComprehension;
-        inAnonFunctionOrComprehension = declared&&inExtends;
+        boolean oile = inLazyExpression;
+        inLazyExpression = declared&&(inExtends||inParameter);
         boolean odefinitely = definitely;
         boolean opossibly = possibly;
         boolean opossiblyExited = possiblyExited;
@@ -539,7 +593,7 @@ public class SpecificationVisitor extends Visitor {
         definitelyExited = odefinitelyExited;
         definitelyByLoopBreaks = odefinitelyByLoopBreaks;
         possiblyByLoopBreaks = opossiblyByLoopBreaks;
-        inAnonFunctionOrComprehension = oicoaf;
+        inLazyExpression = oile;
         specificationDisabled = c;
     }
     
@@ -801,8 +855,8 @@ public class SpecificationVisitor extends Visitor {
     }*/
     
     private boolean blockEndsInBreak(Tree.Block that) {
-        return blockEndsInReturnThrowBreak(that) &&
-                !blockEndsInReturnThrow(that);
+        return blockEndsInReturnThrowBreak(that) 
+            && !blockEndsInReturnThrow(that);
     }
     
     private boolean blockEndsInReturnThrow(Tree.Block that) {
@@ -833,7 +887,7 @@ public class SpecificationVisitor extends Visitor {
                     }
                     if (ec!=null) {
                         return blockEndsInReturnThrow(ic.getBlock())
-                                && blockEndsInReturnThrow(ec.getBlock());
+                            && blockEndsInReturnThrow(ec.getBlock());
                     }
                 }
             }
@@ -864,8 +918,8 @@ public class SpecificationVisitor extends Visitor {
                     }
                 }
             }
-            return s instanceof Tree.Return ||
-                    s instanceof Tree.Throw;
+            return s instanceof Tree.Return 
+                || s instanceof Tree.Throw;
         }
         else {
             return false;
@@ -900,7 +954,7 @@ public class SpecificationVisitor extends Visitor {
                     }
                     if (ec!=null) {
                         return blockEndsInReturnThrowBreak(ic.getBlock())
-                                && blockEndsInReturnThrowBreak(ec.getBlock());
+                            && blockEndsInReturnThrowBreak(ec.getBlock());
                     }
                 }
             }
@@ -927,13 +981,13 @@ public class SpecificationVisitor extends Visitor {
                     }
                     if (ec!=null) {
                         return blockEndsInReturnThrowBreak(fc.getBlock())
-                                && blockEndsInReturnThrowBreak(ec.getBlock());
+                            && blockEndsInReturnThrowBreak(ec.getBlock());
                     }
                 }
             }
-            return s instanceof Tree.Return ||
-                    s instanceof Tree.Throw ||
-                    s instanceof Tree.Break;
+            return s instanceof Tree.Return 
+                || s instanceof Tree.Throw 
+                || s instanceof Tree.Break;
         }
         else {
             return false;
@@ -1013,7 +1067,8 @@ public class SpecificationVisitor extends Visitor {
     
     @Override
     public void visit(Tree.SpecifierStatement that) {
-        Tree.Term term = that.getBaseMemberExpression();
+        Term lhs = that.getBaseMemberExpression();
+        Tree.Term term = lhs;
         boolean parameterized = false;
         while (term instanceof Tree.ParameterizedExpression) {
             Tree.ParameterizedExpression pe = 
@@ -1027,14 +1082,15 @@ public class SpecificationVisitor extends Visitor {
                         term;
             Declaration member = bme.getDeclaration();
             if (member==declaration) {
-                if (!isForwardReferenceable()) {
+                if (!isForwardReferenceable() 
+                        && !lhs.hasErrors()) {
                     if (declaration.isFormal()) {
                         bme.addError("member is formal and may not be specified: " +
-                                name() + " is declared formal");
+                                name() + " is declared 'formal'");
                     }
                     else if (declaration.isDefault()) {
                         bme.addError("member is default and may not be specified except in its declaration: " +
-                                name() + " is declared default");
+                                name() + " is declared 'default'");
                     }
                 }
                 if (that.getRefinement()) {
@@ -1177,7 +1233,7 @@ public class SpecificationVisitor extends Visitor {
         lastContinue = null;
         endsInReturnThrow = false;
         endsInBreak = false;
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             loopDepth = 0;
             brokenLoopDepth = 0;
             specificationDisabled = true;
@@ -1236,6 +1292,22 @@ public class SpecificationVisitor extends Visitor {
         endsInBreak = of;
         lastContinue = olc;
     }
+
+    private boolean isSameDeclaration(Tree.Declaration that) {
+        Declaration dec = that.getDeclarationModel();
+        if (dec instanceof Class && dec.isAbstraction()) {
+            return dec==declaration
+                || dec.getOverloads().contains(declaration);
+        }
+        else {
+            return dec==declaration;
+        }
+    }
+    
+    private boolean isSameDeclaration(Tree.TypedArgument that) {
+        Declaration dec = that.getDeclarationModel();
+        return dec==declaration;
+    }
     
     @Override
     public void visit(Tree.Constructor that) {
@@ -1246,9 +1318,9 @@ public class SpecificationVisitor extends Visitor {
             specify();
         }
         super.visit(that);
-        if (declaration.getContainer()==c.getContainer() &&
-                that==lastConstructor && 
-                initedByEveryConstructor) {
+        if (declaration.getContainer()==c.getContainer() 
+                && that==lastConstructor 
+                && initedByEveryConstructor) {
             definitely = true;
         }
     }
@@ -1262,16 +1334,18 @@ public class SpecificationVisitor extends Visitor {
             specify();
         }
         super.visit(that);
-        if (declaration.getContainer()==e.getContainer() &&
-                that==lastConstructor && 
-                initedByEveryConstructor) {
+        if (declaration.getContainer()==e.getContainer() 
+                && that==lastConstructor 
+                && initedByEveryConstructor) {
             definitely = true;
         }
     }
 
     @Override
     public void visit(Tree.TypedArgument that) {
-        if (that.getDeclarationModel()==declaration) {
+        boolean oile = inLazyExpression;
+        inLazyExpression = declared&&(inExtends||inParameter);
+        if (isSameDeclaration(that)) {
             loopDepth = 0;
             brokenLoopDepth = 0;
             specificationDisabled = true;
@@ -1310,45 +1384,47 @@ public class SpecificationVisitor extends Visitor {
             loopDepth = l;
             brokenLoopDepth = bl;
         }
+        inLazyExpression = oile;
     }
     
     @Override
     public void visit(Tree.MethodDeclaration that) {
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             if (that.getSpecifierExpression()!=null) {
                 specify();
                 super.visit(that);
             }
             else {
                 super.visit(that);
-                if (declaration.isToplevel() && 
-                        !isNativeHeader(declaration) &&
-                        !declaration.isJavaNative()) {
+                if (declaration.isToplevel() 
+                        && !isNativeHeader(declaration) 
+                        && !declaration.isJavaNative()) {
                     that.addError("toplevel function must be specified: " +
                             name() + 
                             " may not be forward declared");
                 }
-                else if (declaration.isStatic() && 
-                        !isNativeHeader(declaration)) {
+                else if (declaration.isStatic() 
+                        && !isNativeHeader(declaration)) {
                     that.addError("static function must be specified: " +
                             name() + 
                             " may not be forward declared");
                 }
-                else if (declaration.isClassMember() && 
-                        !isNativeHeader(declaration) &&
-                        !declaration.isFormal() && 
-                        !declaration.isJavaNative() &&
-                        that.getDeclarationModel()
-                            .getInitializerParameter()==null &&
-                        declarationSection) {
+                else if (declaration.isClassMember() 
+                        && !isNativeHeader(declaration) 
+                        && !declaration.isFormal() 
+                        && !declaration.isJavaNative() 
+                        && that.getDeclarationModel()
+                               .getInitializerParameter()
+                                   ==null 
+                        && declarationSection) {
                     that.addError("forward declaration may not occur in declaration section: " +
                                 name(), 
                                 1450);
                 }
-                else if (declaration.isInterfaceMember() && 
-                        !isNativeHeader(declaration) &&
-                        !declaration.isFormal() &&
-                        !declaration.isJavaNative()) {
+                else if (declaration.isInterfaceMember() 
+                        && !isNativeHeader(declaration) 
+                        && !declaration.isFormal() 
+                        && !declaration.isJavaNative()) {
                     that.addError("interface method must be formal or specified: " +
                             name(), 
                             1400);
@@ -1362,7 +1438,7 @@ public class SpecificationVisitor extends Visitor {
     
     @Override
     public void visit(Tree.MethodDefinition that) {
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             declare();
             specify();
         }
@@ -1371,7 +1447,7 @@ public class SpecificationVisitor extends Visitor {
     
     @Override
     public void visit(Tree.MethodArgument that) {
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             declare();
             specify();
         }
@@ -1381,7 +1457,7 @@ public class SpecificationVisitor extends Visitor {
     @Override
     public void visit(Tree.Variable that) {
         super.visit(that);
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             specify();
         }
     }
@@ -1389,10 +1465,13 @@ public class SpecificationVisitor extends Visitor {
     @Override
     public void visit(Tree.Parameter that) {
         Parameter p = that.getParameterModel();
-        Parameter oip = parameter;
+        boolean oip = inParameter;
+        inParameter = true;
+        Parameter op = parameter;
         parameter = p;
         super.visit(that);
-        parameter = oip;
+        parameter = op;
+        inParameter = oip;
         if (p!=null && p.getModel()==declaration) {
             specify();
         }
@@ -1417,14 +1496,14 @@ public class SpecificationVisitor extends Visitor {
     @Override
     public void visit(Tree.TypeParameterDeclaration that) {
         super.visit(that);
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             specify();
         }
     }
     
     @Override
     public void visit(Tree.AttributeDeclaration that) {
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             Tree.SpecifierOrInitializerExpression sie = 
                     that.getSpecifierOrInitializerExpression();
             if (sie!=null) {
@@ -1458,14 +1537,15 @@ public class SpecificationVisitor extends Visitor {
                                 name());
                     }
                 }
-                else if (declaration.isClassOrInterfaceMember() && 
-                        !isNativeHeader(declaration) &&
-                        !declaration.isFormal() &&
-                        !declaration.isJavaNative() &&
-                        that.getDeclarationModel()
-                            .getInitializerParameter()==null &&
-                        !that.getDeclarationModel().isLate() &&
-                        declarationSection) {
+                else if (declaration.isClassOrInterfaceMember() 
+                        && !isNativeHeader(declaration) 
+                        && !declaration.isFormal() 
+                        && !declaration.isJavaNative() 
+                        && that.getDeclarationModel()
+                               .getInitializerParameter()
+                                   ==null 
+                        && !that.getDeclarationModel().isLate() 
+                        && declarationSection) {
                     that.addError("forward declaration may not occur in declaration section: " +
                             name(), 
                             1450);
@@ -1479,7 +1559,7 @@ public class SpecificationVisitor extends Visitor {
     
     @Override
     public void visit(Tree.AttributeGetterDefinition that) {
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             declare();
             super.visit(that);        
             specify();
@@ -1502,7 +1582,7 @@ public class SpecificationVisitor extends Visitor {
     
     @Override
     public void visit(Tree.AttributeArgument that) {
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             declare();
             specify();
         }
@@ -1511,7 +1591,7 @@ public class SpecificationVisitor extends Visitor {
     
     @Override
     public void visit(Tree.ObjectDefinition that) {
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             declare();
             specify();
         }
@@ -1520,7 +1600,7 @@ public class SpecificationVisitor extends Visitor {
     
     @Override
     public void visit(Tree.ObjectArgument that) {
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             declare();
             specify();
         }
@@ -1575,8 +1655,8 @@ public class SpecificationVisitor extends Visitor {
                 @Override
                 public void visit(Tree.Declaration that) {
                     super.visit(that);
-                    if (declarationSection &&
-                            that.getDeclarationModel()==declaration) {
+                    if (declarationSection 
+                            && isSameDeclaration(that)) {
                         definedInDeclarationSection = true;
                     }
                     if (that==lastExecutableStatement) {
@@ -1586,9 +1666,9 @@ public class SpecificationVisitor extends Visitor {
                 @Override
                 public void visit(Tree.StaticMemberOrTypeExpression that) {
                     super.visit(that);
-                    if (declarationSection &&
-                            declaration instanceof FunctionOrValue &&
-                            that.getDeclaration()==declaration) {
+                    if (declarationSection 
+                            && declaration instanceof FunctionOrValue 
+                            && that.getDeclaration()==declaration) {
                         usedInDeclarationSection = true;
                     }
                 }
@@ -1604,10 +1684,7 @@ public class SpecificationVisitor extends Visitor {
                     Node d = getDeclaration(that);
                     if (d==null) d = that;
                     d.addError("must be definitely specified by class initializer: " + 
-                                message(declaration) + 
-                                (declaration.isShared() ? 
-                                        " is shared" : 
-                                        " is captured"), 
+                                message(declaration) + explanation(), 
                                 1401);
                 }
             }
@@ -1615,6 +1692,12 @@ public class SpecificationVisitor extends Visitor {
         else {
             super.visit(that);
         }
+    }
+
+    private String explanation() {
+        return declaration.isShared() ? 
+                " is shared" : 
+                " is captured";
     }
     
     @Override
@@ -1653,7 +1736,7 @@ public class SpecificationVisitor extends Visitor {
     
     @Override
     public void visit(Tree.ClassOrInterface that) {
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             declare();
             specify();
         }
@@ -1662,7 +1745,7 @@ public class SpecificationVisitor extends Visitor {
     
     @Override
     public void visit(Tree.TypeAliasDeclaration that) {
-        if (that.getDeclarationModel()==declaration) {
+        if (isSameDeclaration(that)) {
             declare();
             specify();
         }
@@ -1671,44 +1754,38 @@ public class SpecificationVisitor extends Visitor {
     
     public void visit(Tree.Return that) {
         super.visit(that);
-        if (!specificationDisabled && 
-                isSharedDeclarationUninitialized()) {
+        if (!specificationDisabled 
+                && isSharedDeclarationUninitialized()) {
             that.addError("must be definitely specified by class initializer: " +
-                    message(declaration) + 
-                    (declaration.isShared() ? 
-                            " is shared" : 
-                            " is captured"));
+                    message(declaration) + explanation());
         }
-        else if (that.getDeclaration()==declaration.getContainer() &&
-                isCapturedDeclarationUninitialized()) {
+        else if (that.getDeclaration()==declaration.getContainer() 
+                && isCapturedDeclarationUninitialized()) {
             that.addError("must be definitely specified by class initializer: " +
-                    message(declaration) + 
-                    (declaration.isShared() ? 
-                            " is shared" : 
-                            " is captured"));
+                    message(declaration) + explanation());
         }
         exit();
     }
 
     private boolean isSharedDeclarationUninitialized() {
         return (declaration.isShared() || 
-                declaration.getOtherInstanceAccess()) && 
-                !declaration.isFormal() &&
-                !declaration.isJavaNative() && 
-                !isNativeHeader(declaration) &&
-                !isLate() &&
-                !definitely;
+                declaration.getOtherInstanceAccess()) 
+            && !declaration.isFormal() 
+            && !declaration.isJavaNative() 
+            && !isNativeHeader(declaration) 
+            && !isLate() 
+            && !definitely;
     }
     
     private boolean isCapturedDeclarationUninitialized() {
         return (declaration.isShared() || 
                 declaration.getOtherInstanceAccess() ||
-                usedInDeclarationSection) &&
-                !definedInDeclarationSection &&
-                !declaration.isFormal() && 
-                !isNativeHeader(declaration) &&
-                !isLate() &&
-                !definitely;
+                usedInDeclarationSection) 
+            && !definedInDeclarationSection 
+            && !declaration.isFormal() 
+            && !isNativeHeader(declaration) 
+            && !isLate() 
+            && !definitely;
     }
     
     @Override

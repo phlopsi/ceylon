@@ -1,5 +1,7 @@
 package com.redhat.ceylon.tools.fatjar;
 
+import static com.redhat.ceylon.common.JVMModuleUtil.javaClassNameFromCeylon;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -16,13 +18,11 @@ import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
-import java.util.zip.ZipOutputStream;
 
 import com.redhat.ceylon.cmr.api.ModuleQuery;
 import com.redhat.ceylon.cmr.ceylon.loader.ModuleGraph;
 import com.redhat.ceylon.cmr.impl.IOUtils;
 import com.redhat.ceylon.common.FileUtil;
-import com.redhat.ceylon.common.JVMModuleUtil;
 import com.redhat.ceylon.common.ModuleSpec;
 import com.redhat.ceylon.common.Versions;
 import com.redhat.ceylon.common.tool.Argument;
@@ -33,14 +33,14 @@ import com.redhat.ceylon.common.tool.Summary;
 import com.redhat.ceylon.common.tool.ToolUsageError;
 import com.redhat.ceylon.model.cmr.ArtifactResult;
 import com.redhat.ceylon.model.loader.JvmBackendUtil;
-import com.redhat.ceylon.tools.moduleloading.ModuleLoadingTool;
+import com.redhat.ceylon.tools.moduleloading.ResourceRootTool;
 
 @Summary("Generate a Ceylon executable jar for a given module")
 @Description("Gerate an executable _fat jar_ which contains the given module and all its run-time"
         + " dependencies, including the Ceylon run-time, which makes that jar self-sufficient and"
         + " executable by `java` as if the Ceylon module was run by `ceylon run`."
 )
-public class CeylonFatJarTool extends ModuleLoadingTool {
+public class CeylonFatJarTool extends ResourceRootTool {
 
     private List<ModuleSpec> modules;
     private boolean force;
@@ -66,14 +66,14 @@ public class CeylonFatJarTool extends ModuleLoadingTool {
         this.run = run;
     }
 
-    @Description("Target fat-jar file (defaults to `{name}-{version}.jar`).")
+    @Description("Target fat jar file (defaults to `{name}-{version}.jar`).")
     @OptionArgument(shortName = 'o', argumentName="file")
     public void setOut(File out) {
         this.out = out;
     }
 
     @OptionArgument(argumentName="moduleOrFile", shortName='x')
-    @Description("Excludes modules from the resulting far jat. Can be a module name or " + 
+    @Description("Excludes modules from the resulting fat jar. Can be a module name or " + 
             "a file containing module names. Can be specified multiple times. Note that "+
             "this excludes the module from the resulting fat jar, but if your modules require that "+
             "module to be present at runtime it will still be required and may cause your "+
@@ -96,7 +96,7 @@ public class CeylonFatJarTool extends ModuleLoadingTool {
             }
         }
     }
-
+    
     @Option(longName="force")
     @Description("Force generation of mlib folder with multiple versions of the same module.")
     public void setForce(boolean force) {
@@ -138,19 +138,34 @@ public class CeylonFatJarTool extends ModuleLoadingTool {
             FileUtil.delete(outputJar);
         }
         final Set<String> added = new HashSet<>();
+        
+        if (firstModuleName!=null 
+                && run!=null 
+                && !run.contains("::") 
+                && !run.contains(".")) {
+            run = firstModuleName + "::" + run;
+        }
 
         Manifest manifest = new Manifest();
         Attributes mainAttributes = manifest.getMainAttributes();
-        String className = JVMModuleUtil.javaClassNameFromCeylon(firstModuleName, run != null ? run : (firstModuleName + "::run"));
+        final String className = javaClassNameFromCeylon(firstModuleName, run);
         mainAttributes.putValue("Main-Class", className);
         mainAttributes.putValue("Manifest-Version", "1.0");
         mainAttributes.putValue("Created-By", "Ceylon fat-jar for module "+firstModuleName+"/"+firstModuleVersion);
+        writeManifestEntries(mainAttributes);
         added.add("META-INF/");
         added.add("META-INF/MANIFEST.MF");
+        
+        addResources();
 
-        try(ZipOutputStream zipFile = new JarOutputStream(new FileOutputStream(outputJar), manifest)){
+        try(JarOutputStream zipFile 
+                = new JarOutputStream(
+                        new FileOutputStream(outputJar), 
+                        manifest)){
+            writeResources(zipFile);
             final List<ArtifactResult> staticMetamodelEntries = new ArrayList<>();
             loader.visitModules(new ModuleGraph.Visitor() {
+                String runClassPath = className.replace('.', '/') + ".class";
                 @Override
                 public void visit(ModuleGraph.Module module) {
                     if(module.artifact != null){
@@ -167,13 +182,19 @@ public class CeylonFatJarTool extends ModuleLoadingTool {
                                     Enumeration<? extends ZipEntry> entries = src.entries();
                                     while(entries.hasMoreElements()){
                                         ZipEntry srcEntry = entries.nextElement();
+                                        if (srcEntry.getName().equals(runClassPath))
+                                            foundRun = true;
                                         // skip manifests
                                         if(skipEntry(srcEntry.getName()))
                                             continue;
                                         if(!added.add(srcEntry.getName())){
                                             // multiple folders is fine
                                             if(!srcEntry.isDirectory()){
-                                                append("Warning: duplicate entry "+srcEntry.getName()+" (from "+file+") already added: skipping\n");
+                                                append("Warning: skipping duplicate entry ")
+                                                .append(srcEntry.getName())
+                                                .append(" from ")
+                                                .append(file)
+                                                .newline();
                                             }
                                             continue;
                                         }
@@ -196,21 +217,44 @@ public class CeylonFatJarTool extends ModuleLoadingTool {
             zipFile.flush();
         }
         flush();
+        
+        if (!foundRun) {
+            append("Warning: missing run class ").append(className).newline();
+        }
     }
-
+    
+    boolean foundRun;
 
     private boolean skipEntry(String name) {
         return name.equals("META-INF/MANIFEST.MF")
-                || name.equals("META-INF/INDEX.LIST")
-                || name.equals("META-INF/mapping.txt")
-                // skip signatures too
-                || (name.startsWith("META-INF/")
-                        && (name.endsWith(".DSA") || name.endsWith(".RSA") || name.endsWith(".SF")));
+            || name.equals("META-INF/INDEX.LIST")
+            || name.equals("META-INF/mapping.txt")
+            // skip signatures too
+            || (name.startsWith("META-INF/")
+                    && (name.endsWith(".DSA") || name.endsWith(".RSA") || name.endsWith(".SF")));
     }
 
     @Override
     protected boolean shouldExclude(String moduleName, String version) {
-        return super.shouldExclude(moduleName, version) ||
-                this.excludedModules.contains(moduleName);
+        return super.shouldExclude(moduleName, version) 
+            || this.excludedModules.contains(moduleName);
     }
+
+    @Override
+    protected void debug(String key, Object... args) {
+        if (this.verbose != null &&
+                !this.verbose.equals("loader")) {
+            try {
+                append("Debug: ").append(CeylonFatJarMessages.msg(key, args)).newline();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+    
+    @Override
+    protected void usageError(String key, Object... args) {
+        throw new ToolUsageError(CeylonFatJarMessages.msg("resourceRoot.missing", args));
+    }
+
 }

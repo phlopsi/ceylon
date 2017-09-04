@@ -92,8 +92,8 @@ public class FlatRepository extends DefaultRepository {
                     if(overrides != null) {
                         // don't use groupId() because it calls resolve() and we have no external info
                         String[] coordinates = ModuleUtil.getMavenCoordinates(name());
-                        dependencies = new ModuleInfo(name(), version(), coordinates[0], coordinates[1], 
-                                null, new HashSet<ModuleDependencyInfo>());
+                        dependencies = new ModuleInfo(namespace(), name(), version(), coordinates[0], coordinates[1], 
+                                coordinates[2], null, new HashSet<ModuleDependencyInfo>());
                         dependencies = overrides.applyOverrides(name(), version(), dependencies);
                     }
                     

@@ -390,11 +390,11 @@ public class JarOutputRepositoryManager {
                         return classWasUpdated;
                     } else {
                         return modifiedResourceFilesRel.contains(entryFullName)
-                                || entryFullName.equals(FILE_MAPPING)
-                                || entryFullName.equals(FILE_ERRORS)
-                                || entryFullName.equals(FILE_HASHES)
-                                || (writeOsgiManifest && OsgiUtil.OsgiManifest.isManifestFileName(entryFullName))
-                                || (writeMavenManifest && MavenPomUtil.isMavenDescriptor(entryFullName, module));
+                            || entryFullName.equals(FILE_MAPPING)
+                            || entryFullName.equals(FILE_ERRORS)
+                            || entryFullName.equals(FILE_HASHES)
+                            || (writeOsgiManifest && OsgiUtil.OsgiManifest.isManifestFileName(entryFullName))
+                            || (writeMavenManifest && MavenPomUtil.isMavenDescriptor(entryFullName, module));
                     }
                 }
             };
@@ -564,7 +564,7 @@ public class JarOutputRepositoryManager {
         
         public JavaFileObject getJavaFileObject(String fileName, File sourceFile) {
             String quotedFileName = JVMModuleUtil.quoteJavaKeywordsInFilename(fileName);
-            String entryName = handleResourceRoot(quotedFileName.replace(File.separatorChar, '/'));
+            String entryName = handleResourceRoot(quotedFileName);
             if (sourceFile != null) {
                 modifiedSourceFiles.add(sourceFile.getPath());
                 // record the class file we produce so that we don't save it from the original jar

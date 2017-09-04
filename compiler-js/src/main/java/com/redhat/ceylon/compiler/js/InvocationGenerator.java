@@ -11,8 +11,21 @@ import com.redhat.ceylon.compiler.js.util.JsIdentifierNames;
 import com.redhat.ceylon.compiler.js.util.RetainedVars;
 import com.redhat.ceylon.compiler.js.util.TypeUtils;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree;
-import com.redhat.ceylon.model.typechecker.model.*;
 import com.redhat.ceylon.model.typechecker.model.Class;
+import com.redhat.ceylon.model.typechecker.model.Declaration;
+import com.redhat.ceylon.model.typechecker.model.Function;
+import com.redhat.ceylon.model.typechecker.model.Functional;
+import com.redhat.ceylon.model.typechecker.model.Generic;
+import com.redhat.ceylon.model.typechecker.model.Interface;
+import com.redhat.ceylon.model.typechecker.model.ModelUtil;
+import com.redhat.ceylon.model.typechecker.model.Parameter;
+import com.redhat.ceylon.model.typechecker.model.ParameterList;
+import com.redhat.ceylon.model.typechecker.model.Scope;
+import com.redhat.ceylon.model.typechecker.model.SiteVariance;
+import com.redhat.ceylon.model.typechecker.model.Type;
+import com.redhat.ceylon.model.typechecker.model.TypeParameter;
+import com.redhat.ceylon.model.typechecker.model.TypedDeclaration;
+import com.redhat.ceylon.model.typechecker.model.Value;
 
 /** Generates js code for invocation expression (named and positional). */
 public class InvocationGenerator {
@@ -39,13 +52,15 @@ public class InvocationGenerator {
         if (p instanceof Tree.StaticMemberOrTypeExpression) {
             Tree.StaticMemberOrTypeExpression smote = (Tree.StaticMemberOrTypeExpression)p;
             final Declaration d = smote.getDeclaration();
-            final boolean hasTargs = d != null && d.getContainer() instanceof Generic
-                    && !((Generic)d.getContainer()).getTypeParameters().isEmpty();
+            final boolean hasTargs = d != null 
+                    && d.getContainer() instanceof Generic
+                    && ((Generic)d.getContainer()).isParameterized();
             final boolean hasParentTargs = TypeUtils.isStaticWithGenericContainer(d);
-            if (hasTargs && TypeUtils.isConstructor(d)) {
+            if (hasTargs && ModelUtil.isConstructor(d)) {
                 return smote.getTarget().getTypeArguments();
             } else if (hasParentTargs) {
-                if (smote.getTypeArguments() != null && !smote.getTypeArguments().getTypeModels().isEmpty()) {
+                if (smote.getTypeArguments() != null 
+                        && !smote.getTypeArguments().getTypeModels().isEmpty()) {
                     //If the type is static AND has type arguments of its own, we need to merge them
                     Map<TypeParameter, Type> targs = new HashMap<>();
                     targs.putAll(smote.getTarget().getTypeArguments());
@@ -54,12 +69,13 @@ public class InvocationGenerator {
                 }
                 return smote.getTarget().getQualifyingType().getTypeArguments();
             } else if (d instanceof Functional) {
-                Map<TypeParameter,Type> targs = TypeUtils.matchTypeParametersWithArguments(
-                        ((Generic)d).getTypeParameters(),
-                        smote.getTypeArguments() == null ? null :
-                        smote.getTypeArguments().getTypeModels());
+                Map<TypeParameter,Type> targs = 
+                        TypeUtils.matchTypeParametersWithArguments(
+                            d.getTypeParameters(),
+                            smote.getTypeArguments() == null ? null :
+                            smote.getTypeArguments().getTypeModels());
                 if (targs == null) {
-                    gen.out("/*TARGS != TPARAMS!!!! WTF?????*/");
+                    gen.out("/*TARGS != TPARAMS!!!!*/");
                 }
                 return targs;
             }
@@ -127,18 +143,18 @@ public class InvocationGenerator {
             final String fname = names.createTempVariable();
             gen.out(fname,"=");
             typeArgSource.visit(gen);
-            String fuckingargs = "";
+            String theargs = "";
             if (!argnames.isEmpty()) {
-                fuckingargs = argnames.toString().substring(1);
-                fuckingargs = fuckingargs.substring(0, fuckingargs.length()-1);
+                theargs = argnames.toString().substring(1);
+                theargs = theargs.substring(0, theargs.length()-1);
             }
-            gen.out(",", fname, ".$$===undefined?new ", fname, "(", fuckingargs, "):", fname, "(", fuckingargs, "))");
+            gen.out(",", fname, ".$$===undefined?new ", fname, "(", theargs, "):", fname, "(", theargs, "))");
             //TODO we lose type args for now
             return;
         } else {
             final Tree.PositionalArgument lastArg = argList.getPositionalArguments().isEmpty()?null:argList.getPositionalArguments().get(argList.getPositionalArguments().size()-1);
-            boolean hasSpread =  lastArg instanceof Tree.SpreadArgument &&
-                    !TypeUtils.isSequential(lastArg.getTypeModel())
+            boolean hasSpread = lastArg instanceof Tree.SpreadArgument 
+                    && that.getUnit().isUnknownArgumentsCallable(that.getPrimary().getTypeModel())
                     && !typeArgSource.getTypeModel().isUnknown();
             if (hasSpread) {
                 gen.out(gen.getClAlias(), "spread$2(");
@@ -438,7 +454,10 @@ public class InvocationGenerator {
                                 seqargs.add(args.get(argpos));
                             }
                             final Tree.PositionalArgument lastArg = seqargs.get(seqargs.size()-1);
-                            SequenceGenerator.lazyEnumeration(seqargs, that, sequencedType,
+                            if (sequencedType.isTypeParameter()) {
+                                sequencedType = that.getUnit().getIterableType(sequencedType);
+                            }
+                            SequenceGenerator.lazyEnumeration(seqargs, primary, sequencedType,
                                     lastArg instanceof Tree.SpreadArgument ||
                                             lastArg instanceof Tree.Comprehension, gen);
                             return argvars;
@@ -497,7 +516,7 @@ public class InvocationGenerator {
                     generateSpreadArgument(primary, (Tree.SpreadArgument)arg, expr, pd);
                 } else {
                     arg.visit(gen);
-                    if (!arg.getTypeModel().isSequential() && !arg.getTypeModel().isUnknown()) {
+                    if ((pd != null && pd.getType().isSequential()) && !arg.getTypeModel().isSequential() && !arg.getTypeModel().isUnknown()) {
                         gen.out(".sequence()");
                     }
                 }
@@ -597,7 +616,7 @@ public class InvocationGenerator {
             }
         } else if (pd.isSequenced()) {
             arg.visit(gen);
-            if (!TypeUtils.isSequential(arg.getTypeModel())) {
+            if (!arg.getUnit().isSequentialType(arg.getTypeModel())) {
                 gen.out(".sequence()");
             }
         } else if (!arg.getTypeModel().isEmpty()) {
@@ -607,7 +626,7 @@ public class InvocationGenerator {
             final boolean unknownSpread = arg.getTypeModel().isUnknown();
             final String get0 = unknownSpread ?"[":".$_get(";
             final String get1 = unknownSpread ?"]":")";
-            if (!unknownSpread && !TypeUtils.isSequential(arg.getTypeModel())) {
+            if (!unknownSpread && !arg.getUnit().isSequentialType(arg.getTypeModel())) {
                 gen.out(".sequence()");
             }
             gen.out(",");

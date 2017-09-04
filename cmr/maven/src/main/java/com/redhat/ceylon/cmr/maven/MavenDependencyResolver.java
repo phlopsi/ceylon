@@ -23,13 +23,13 @@ import java.util.HashSet;
 import java.util.Set;
 
 import com.redhat.ceylon.cmr.api.AbstractDependencyResolver;
-import com.redhat.ceylon.cmr.api.ArtifactContext;
 import com.redhat.ceylon.cmr.api.DependencyContext;
 import com.redhat.ceylon.cmr.api.ModuleDependencyInfo;
 import com.redhat.ceylon.cmr.api.ModuleInfo;
 import com.redhat.ceylon.cmr.api.Overrides;
 import com.redhat.ceylon.cmr.impl.CMRJULLogger;
 import com.redhat.ceylon.cmr.impl.IOUtils;
+import com.redhat.ceylon.cmr.impl.MavenRepository;
 import com.redhat.ceylon.cmr.impl.NodeUtils;
 import com.redhat.ceylon.cmr.resolver.aether.DependencyDescriptor;
 import com.redhat.ceylon.cmr.spi.Node;
@@ -45,14 +45,14 @@ public class MavenDependencyResolver extends AbstractDependencyResolver {
     private static final Logger logger = new CMRJULLogger();
     
     // ensures that instantiating this resolver without the cmr-maven module will fail
-    private AetherUtils utils = new AetherUtils(logger, null, false, (int)com.redhat.ceylon.common.Constants.DEFAULT_TIMEOUT, null);
+    private AetherUtils utils = new AetherUtils(logger, null, null, false, (int)com.redhat.ceylon.common.Constants.DEFAULT_TIMEOUT, null);
 
     @Override
     public ModuleInfo resolve(DependencyContext context, Overrides overrides) {
         if (context.ignoreInner() == false) {
             ArtifactResult result = context.result();
             File mod = result.artifact();
-            if (mod != null && mod.getName().toLowerCase().endsWith(ArtifactContext.JAR)) {
+            if (mod != null && IOUtils.isZipFile(mod)) {
                 String name = result.name();
                 int p = name.indexOf(':');
                 if (p < 0) {
@@ -114,17 +114,17 @@ public class MavenDependencyResolver extends AbstractDependencyResolver {
     private static ModuleInfo toModuleInfo(DependencyDescriptor descriptor, String name, String version, Overrides overrides) {
         Set<ModuleDependencyInfo> infos = new HashSet<>();
         for (DependencyDescriptor dep : descriptor.getDependencies()) {
-            infos.add(new ModuleDependencyInfo("maven", AetherUtils.toCanonicalForm(dep.getGroupId(), 
-                    dep.getArtifactId()), dep.getVersion(), dep.isOptional(), false, Backends.JAVA, AetherUtils.toModuleScope(dep)));
+            String depName = MavenUtils.moduleName(dep.getGroupId(), dep.getArtifactId(), null);
+            infos.add(new ModuleDependencyInfo(MavenRepository.NAMESPACE, depName, dep.getVersion(), dep.isOptional(), false, Backends.JAVA, AetherUtils.toModuleScope(dep)));
         }
-        String descrName = descriptor.getGroupId()+":"+descriptor.getArtifactId();
+        String descrName = MavenUtils.moduleName(descriptor.getGroupId(), descriptor.getArtifactId(), null);
         // if it's not the descriptor we wanted, let's not return it
         if(name != null && !name.equals(descrName))
             return null;
         if(version != null && !version.equals(descriptor.getVersion()))
             return null;
-        ModuleInfo ret = new ModuleInfo(descrName, descriptor.getVersion(), 
-                descriptor.getGroupId(), descriptor.getArtifactId(), null, infos);
+        ModuleInfo ret = new ModuleInfo(MavenRepository.NAMESPACE, descrName, descriptor.getVersion(), 
+                descriptor.getGroupId(), descriptor.getArtifactId(), null, null, infos);
         if(overrides != null)
             ret = overrides.applyOverrides(descrName, descriptor.getVersion(), ret);
         return ret;

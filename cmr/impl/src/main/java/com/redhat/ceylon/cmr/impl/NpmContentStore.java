@@ -16,8 +16,10 @@
 
 package com.redhat.ceylon.cmr.impl;
 
+import static com.redhat.ceylon.cmr.api.ArtifactContext.getSuffixFromFilename;
+import static com.redhat.ceylon.cmr.resolver.javascript.JavaScriptResolver.readNpmDescriptor;
+
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -25,7 +27,6 @@ import java.util.Collections;
 import java.util.Map;
 
 import com.redhat.ceylon.cmr.api.ArtifactContext;
-import com.redhat.ceylon.cmr.resolver.javascript.JavaScriptResolver;
 import com.redhat.ceylon.cmr.spi.ContentHandle;
 import com.redhat.ceylon.cmr.spi.ContentOptions;
 import com.redhat.ceylon.cmr.spi.Node;
@@ -40,6 +41,7 @@ import com.redhat.ceylon.model.cmr.RepositoryException;
  * @author Tako Schotanus (tako@ceylon-lang.org)
  */
 public class NpmContentStore extends AbstractContentStore {
+    
     private final File out;
     private final FileContentStore[] stores;
     private final FileContentStore outstore;
@@ -79,13 +81,19 @@ public class NpmContentStore extends AbstractContentStore {
 
     public OpenNode find(Node parent, String child) {
         DefaultNode node = null;
-        if (hasContent(child) == false) {
+        if (!hasContent(child) //TODO: this test looks like rubbish to me!
+                || parent.getLabel().startsWith("@")
+                || parent instanceof RootNode) { //RootNode has an empty label
             node = new DefaultNode(child);
             node.setContentMarker();
             return node;
         } else {
-            if (ArtifactContext.getSuffixFromFilename(child).equals(ArtifactContext.JS)) {
-                child = getTrueArtifactName(parent);
+            if (getSuffixFromFilename(child)
+                    .equals(ArtifactContext.JS)) {
+                String artifactName = getTrueArtifactName(parent);
+                if (artifactName != null) {
+                    child = artifactName;
+                }
             }
             for (FileContentStore store : stores) {
                 OpenNode result = store.find(parent, child);
@@ -109,21 +117,36 @@ public class NpmContentStore extends AbstractContentStore {
     }
 
     private String getTrueArtifactName(Node parent) {
-        Node node = parent.getChild("package.json");
+        final Node node;
+        try {
+            node = parent.getChild("package.json");
+        } catch (NullPointerException ex) {
+            return null;
+        }
         try {
             File json = node.getContent(File.class);
             if (json.exists() && json.isFile() && json.canRead()) {
                 //Parse json, get "main", that's the file we need
-                try (FileReader reader = new FileReader(json)){
-                    Map<String,Object> descriptor = JavaScriptResolver.readNpmDescriptor(json);
-                    Object main = descriptor.get("main");
-                    if (main instanceof String) {
-                        return (String)main;
-                    } else if (main == null) {
-                        return "index.js";
+                Map<String,Object> descriptor = readNpmDescriptor(json);
+                Object main = descriptor.get("main");
+                if (main == null) {
+                    return "index.js";
+                } else if (main instanceof String) {
+                    String string = (String) main; 
+                    if (string.endsWith(".js")) {
+                        return string;
                     } else {
-                        throw new RepositoryException("unexpected value for 'main' in npm descriptor: " + json);
+                        //TODO: this is rubbish, but I don't understand    
+                        //      what the rules really are
+                        if (string.equals("lib") || string.endsWith("/lib")) {
+                            return string + "/index.js";
+                        }
+                        else {
+                            return string + ".js";
+                        }
                     }
+                } else {
+                    throw new RepositoryException("unexpected value for 'main' in npm descriptor: " + json);
                 }
             } else {
                 throw new RepositoryException("npm descriptor not found: " + json);
@@ -149,39 +172,45 @@ public class NpmContentStore extends AbstractContentStore {
         }
     }
 
-    /**
-     * 
-     */
     public void installNpmModule(Node node) {
         try {
             if (!out.exists()) {
                 out.mkdirs();
             }
             ArtifactContext ac = ArtifactContext.fromNode(node);
-            String name = ac.getName();
-            String version = ac.getVersion();
-            String module = version.isEmpty() ? name : name + "@" + version;
-            if (log != null) log.debug("installing npm module " + module + " in " + out);
-            String npmCmd = npmCommand != null ? npmCommand : System.getProperty(Constants.PROP_CEYLON_EXTCMD_NPM, "npm");
-            ProcessBuilder pb = new ProcessBuilder()
-                    .command(npmCmd, "install", "--silent", "--no-bin-links", module)
-                    .directory(out.getParentFile())
-                    .inheritIO();
-            Map<String, String> env = pb.environment();
-            String pathVariableName = "PATH";
-            for (String key : env.keySet()) {
-                if (key.equalsIgnoreCase("path")) {
-                    pathVariableName = key;
-                    break;
+            if (ac != null) {
+                String name = ac.getName();
+                if (name.contains(":")) {
+                    name = "@" + name.replace(':', '/');
                 }
-            }
-            String pathForRunningNpm = path != null ? path : System.getProperty(Constants.PROP_CEYLON_EXTCMD_PATH, System.getenv("PATH"));
-            env.put(pathVariableName, pathForRunningNpm);
-            
-            Process p = pb.start();
-            p.waitFor();
-            if (p.exitValue() != 0) {
-                throw new RepositoryException("npm installer failed with exit code: " + p.exitValue());
+                String version = ac.getVersion();
+                String module = version.isEmpty() ? name : name + "@" + version;
+                if (log != null) {
+                    log.debug("installing npm module " + module + " in " + out);
+                }
+                String npmCmd = npmCommand != null ? npmCommand : 
+                    System.getProperty(Constants.PROP_CEYLON_EXTCMD_NPM, "npm");
+                ProcessBuilder pb = new ProcessBuilder()
+                        .command(npmCmd, "install", "--silent", "--no-bin-links", module)
+                        .directory(out.getParentFile())
+                        .inheritIO();
+                Map<String, String> env = pb.environment();
+                String pathVariableName = "PATH";
+                for (String key : env.keySet()) {
+                    if (key.equalsIgnoreCase("path")) {
+                        pathVariableName = key;
+                        break;
+                    }
+                }
+                String pathForRunningNpm = path != null ? path : 
+                    System.getProperty(Constants.PROP_CEYLON_EXTCMD_PATH, System.getenv("PATH"));
+                env.put(pathVariableName, pathForRunningNpm);
+                
+                Process p = pb.start();
+                p.waitFor();
+                if (p.exitValue() != 0) {
+                    throw new RepositoryException("npm installer for '" + name + "' failed with exit code: " + p.exitValue());
+                }
             }
         } catch (InterruptedException | IOException ex) {
             throw new RepositoryException("error running npm installer (make sure 'npm' is installed and available in your PATH)", ex);

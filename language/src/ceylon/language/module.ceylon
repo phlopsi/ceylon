@@ -26,9 +26,10 @@
  other Ceylon module, and may not be explicitly imported.
  
  [spec]: http://ceylon-lang.org/documentation/current/spec"
+label ("Ceylon Language Module")
 by ("Gavin King", "Tom Bentley", "Tako Schotanus",
    "Stephane Epardaud", "Enrique Zamudio")
 license ("http://www.apache.org/licenses/LICENSE-2.0.html")
-module ceylon.language maven:"org.ceylon-lang" "1.3.3-SNAPSHOT" {
+module ceylon.language maven:"org.ceylon-lang" "1.3.4-SNAPSHOT"/*@CEYLON_VERSION@*/ {
     native("jvm") import java.base "7";
 }

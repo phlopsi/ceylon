@@ -597,6 +597,7 @@ public class ImportJarToolTests extends AbstractToolTests {
     		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
     			if(file.getFileName().toString().endsWith(".jar") 
     					|| file.getFileName().toString().endsWith(".car")){
+    			    System.err.println("Checking file "+file);
     				Path p = repoPath.relativize(file.getParent());
     				String module = p.getParent().toString().replace('/', '.');
     				String version = p.getFileName().toString();
@@ -630,9 +631,7 @@ public class ImportJarToolTests extends AbstractToolTests {
         			"--missing-dependency-packages", "org.apache.logkit/1.0.1=org.apache.log.**"
         			));
         }
-        if(module.startsWith("org.codehaus.plexus")
-        		|| module.startsWith("org.eclipse.aether")
-        		|| module.startsWith("org.apache.maven")){
+        if(module.startsWith("com.redhat.ceylon.aether")){
         	options.addAll(0, Arrays.asList("--ignore-annotations"));
         }
         tool = pluginFactory.bindArguments(model, getMainTool(), options);

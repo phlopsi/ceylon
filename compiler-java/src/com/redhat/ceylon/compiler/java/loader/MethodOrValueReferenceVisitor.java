@@ -23,6 +23,7 @@ import com.redhat.ceylon.model.typechecker.model.Declaration;
 import com.redhat.ceylon.model.typechecker.model.Function;
 import com.redhat.ceylon.model.typechecker.model.FunctionOrValue;
 import com.redhat.ceylon.model.typechecker.model.Functional;
+import com.redhat.ceylon.model.typechecker.model.ModelUtil;
 import com.redhat.ceylon.model.typechecker.model.Scope;
 import com.redhat.ceylon.model.typechecker.model.Setter;
 import com.redhat.ceylon.model.typechecker.model.TypeDeclaration;
@@ -97,8 +98,7 @@ public class MethodOrValueReferenceVisitor extends Visitor {
                     boolean sameScope = d.getContainer().equals(s)
                             || (s instanceof Declaration
                                     && (Decl.isParameter((Declaration)s) || (s instanceof Value && !((Value)s).isTransient()))
-                                    && d.getContainer().equals(s.getScope()))
-                                    ;
+                                    && d.getContainer().equals(s.getScope()));
                     if (!sameScope || methodSpecifier || inLazySpecifierExpression) {
                         ((FunctionOrValue)d).setCaptured(true);
                     }
@@ -143,7 +143,7 @@ public class MethodOrValueReferenceVisitor extends Visitor {
         TypeDeclaration type = d.getTypeDeclaration();
         Scope scope = that.getScope();
         while(scope != null 
-                && scope instanceof Package == false
+                && !(scope instanceof Package)
                 && !Decl.equalScopeDecl(scope, type)) {
             scope = scope.getScope();
         }
@@ -265,9 +265,9 @@ public class MethodOrValueReferenceVisitor extends Visitor {
                                 Tree.ExtendedTypeExpression ete = (Tree.ExtendedTypeExpression)ctor.getDelegatedConstructor().getInvocationExpression().getPrimary();
                                 // are we delegating to a constructor (not a supertype) of the same class (this class)?
                                 if (Decl.isConstructor(ete.getDeclaration())
-                                        && Decl.getConstructedClass(ete.getDeclaration()).equals(that.getDeclarationModel())) {
+                                        && ModelUtil.getConstructedClass(ete.getDeclaration()).equals(that.getDeclarationModel())) {
                                     // remember the delegation
-                                    Constructor delegate = Decl.getConstructor(ete.getDeclaration());
+                                    Constructor delegate = ModelUtil.getConstructor(ete.getDeclaration());
                                     ConstructorPlan delegatePlan = constructorPlans.get(delegate);
                                     plan.delegate = delegatePlan;
                                     // mark the delegate as delegated
@@ -354,15 +354,17 @@ public class MethodOrValueReferenceVisitor extends Visitor {
     private int usedIn(List<Statement> stmts) {
         for(Tree.Statement stmt : stmts){
             // count declarations as usage
-            if(stmt instanceof Tree.TypedDeclaration
-                    && ((Tree.TypedDeclaration) stmt).getDeclarationModel() == declaration)
-                return 1;
+            if (stmt instanceof Tree.TypedDeclaration){
+                Tree.TypedDeclaration td = (Tree.TypedDeclaration)stmt;
+                if (td.getDeclarationModel() == declaration)
+                    return 1;
+            }
             stmt.visit(this);
             if(declaration.isCaptured())
                 break;
         }
         boolean used = declaration.isCaptured();
-        FunctionOrValue fov = ((FunctionOrValue)declaration);
+        FunctionOrValue fov = (FunctionOrValue)declaration;
         fov.setCaptured(false);
         if(fov instanceof Value){
             Value val = (Value) fov;
@@ -381,7 +383,7 @@ public class MethodOrValueReferenceVisitor extends Visitor {
     @Override public void visit(Tree.MethodDefinition that) {
         boolean cs = enterCapturingScope();
         super.visit(that);
-        if (Decl.withinClass(that)) {
+        if (that.getDeclarationModel().isClassMember()) {
             // This is a HACK to make sure that method definitions
             // are always seen as captured and can't be confused
             // for being part of the initializer. This is because
@@ -397,14 +399,18 @@ public class MethodOrValueReferenceVisitor extends Visitor {
     
     
     @Override public void visit(Tree.AttributeDeclaration that) {
+        final SpecifierOrInitializerExpression specifier = 
+                that.getSpecifierOrInitializerExpression();
+        Value model = that.getDeclarationModel();
+        boolean lse = inLazySpecifierExpression;
+        if (specifier != null 
+                && model.isLate()
+                && model.isClassMember()) {
+            model.setCaptured(true);
+            inLazySpecifierExpression = true;
+        }
         super.visit(that);
-        final SpecifierOrInitializerExpression specifier = that.getSpecifierOrInitializerExpression();
-        if (specifier != null && (specifier instanceof Tree.LazySpecifierExpression
-                || that.getDeclarationModel().isLate())) {
-            boolean cs = enterCapturingScope();
-            specifier.visit(this);
-            exitCapturingScope(cs);
-        }   
+        inLazySpecifierExpression = lse;
     }
     
     @Override public void visit(Tree.AttributeGetterDefinition that) {

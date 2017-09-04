@@ -329,6 +329,7 @@ public class FunctionHelper {
             }
             Tree.ParameterList paramList = that.getParameterLists().get(0);
             paramList.visit(gen);
+            gen.pushImports(that.getBlock());
             gen.beginBlock();
             if (d.getContainer() instanceof TypeDeclaration) {
                 gen.initSelf(that);
@@ -337,6 +338,7 @@ public class FunctionHelper {
             gen.initParameters(paramList, null, d);
             gen.visitStatements(that.getBlock().getStatements());
             gen.endBlock();
+            gen.popImports(that.getBlock());
         } else {
             List<MplData> metas = new ArrayList<>(that.getParameterLists().size());
             for (Tree.ParameterList paramList : that.getParameterLists()) {
@@ -384,8 +386,9 @@ public class FunctionHelper {
             } else if (st instanceof Tree.Destructure) {
                 final String expvar = gen.getNames().createTempVariable();
                 gen.out(expvar, "=");
-                ((Tree.Destructure)st).getSpecifierExpression().visit(gen);
-                decs2.addAll(new Destructurer(((Tree.Destructure)st).getPattern(),
+                Tree.Destructure destructure = (Tree.Destructure)st;
+                destructure.getSpecifierExpression().visit(gen);
+                decs2.addAll(new Destructurer(destructure.getPattern(),
                         gen, directs, expvar, false, false).getDeclarations());
             }
             first=false;
@@ -508,7 +511,7 @@ public class FunctionHelper {
             if (name == null) {
                 name = gen.memberAccess(that, "");
             }
-            if (TypeUtils.isConstructor(d)) {
+            if (ModelUtil.isConstructor(d)) {
                 Constructor cd = TypeUtils.getConstructor(d);
                 final boolean hasTargs = BmeGenerator.hasTypeParameters(
                         (Tree.BaseTypeExpression) that.getPrimary());
@@ -550,7 +553,7 @@ public class FunctionHelper {
         String primaryVar = gen.createRetainedTempVar();
         gen.out("(", primaryVar, "=");
         that.getPrimary().visit(gen);
-        if (!(that.getStaticMethodReferencePrimary() && !TypeUtils.isConstructor(that.getDeclaration()))) {
+        if (!(that.getStaticMethodReferencePrimary() && !ModelUtil.isConstructor(that.getDeclaration()))) {
             gen.out(",");
             final String member = (name == null) ? gen.memberAccess(that, primaryVar) : (primaryVar+"."+name);
             if (that.getDeclaration() instanceof Function

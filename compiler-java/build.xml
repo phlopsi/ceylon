@@ -66,13 +66,6 @@
         <pathelement path="${maven-support.lib}" />
         <pathelement path="${shrinkwrap-maven-uberjar.lib}" />
         <pathelement path="${jboss-logmanager.lib}" />
-        <pathelement path="${slf4j-simple.lib}" />
-        <pathelement path="${slf4j-api.lib}" />
-        <pathelement path="${sardine.lib}" />
-        <pathelement path="${httpcore.lib}" />
-        <pathelement path="${httpclient.lib}" />
-        <pathelement path="${commons-codec.lib}" />
-        <pathelement path="${commons-logging.lib}" />
         <pathelement path="${json.lib}" />
     </path>
 
@@ -232,6 +225,10 @@
                 <exclude name="ceylon/**" />
                 <exclude name="javax/**" />
                 <exclude name="com/redhat/ceylon/compiler/java/test/**" />
+                <exclude name="com/redhat/ceylon/compiler/java/codegen/NamingTests*" />
+                <exclude name="com/redhat/ceylon/ceylondoc/test/**" />
+                <exclude name="com/redhat/ceylon/itest/**" />
+                <exclude name="com/redhat/ceylon/tools/**" />
                 <exclude name="com/redhat/ceylon/ant/**" />
                 <exclude name="com/redhat/ceylon/common/**" />
                 <exclude name="com/redhat/ceylon/launcher/**" />

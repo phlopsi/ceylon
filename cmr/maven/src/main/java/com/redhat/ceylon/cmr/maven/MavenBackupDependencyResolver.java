@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import com.redhat.ceylon.cmr.api.AbstractDependencyResolver;
-import com.redhat.ceylon.cmr.api.ArtifactContext;
 import com.redhat.ceylon.cmr.api.DependencyContext;
 import com.redhat.ceylon.cmr.api.ModuleInfo;
 import com.redhat.ceylon.cmr.api.Overrides;
@@ -48,7 +47,7 @@ public class MavenBackupDependencyResolver extends AbstractDependencyResolver {
         if (context.ignoreInner() == false) {
             ArtifactResult result = context.result();
             File mod = result.artifact();
-            if (mod != null && mod.getName().toLowerCase().endsWith(ArtifactContext.JAR)) {
+            if (mod != null && IOUtils.isZipFile(mod)) {
                 String name = result.name();
                 int p = name.indexOf(':');
                 if (p < 0) {

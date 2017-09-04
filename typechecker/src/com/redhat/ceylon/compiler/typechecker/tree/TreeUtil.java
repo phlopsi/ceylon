@@ -81,37 +81,10 @@ public class TreeUtil {
     }
     
     public static String getAnnotationArgument(Tree.Annotation ann, 
-            int index) {
+            int index, Unit unit) {
         String result = null;
-        Tree.Expression expression = null;
-        Tree.PositionalArgumentList pal = 
-                ann.getPositionalArgumentList();
-        if (pal!=null) {
-            List<Tree.PositionalArgument> args = 
-                    pal.getPositionalArguments();
-            if (!args.isEmpty()) {
-                Tree.PositionalArgument arg = args.get(index);
-                if (arg instanceof Tree.ListedArgument) {
-                    Tree.ListedArgument la = 
-                            (Tree.ListedArgument) arg;
-                    expression = la.getExpression();
-                }
-            }
-        }
-        Tree.NamedArgumentList nal = 
-                ann.getNamedArgumentList();
-        if (nal!=null) {
-            List<Tree.NamedArgument> args = 
-                    nal.getNamedArguments();
-            if (!args.isEmpty()) {
-                Tree.SpecifiedArgument arg = 
-                        (Tree.SpecifiedArgument)
-                            args.get(index);
-                expression = 
-                        arg.getSpecifierExpression()
-                            .getExpression();
-            }
-        }
+        Tree.Expression expression = 
+                getAnnotationArgumentExpression(ann, index);
         if (expression!=null) {
             Tree.Term term = expression.getTerm();
             if (term instanceof Tree.Literal) {
@@ -123,8 +96,63 @@ public class TreeUtil {
                             result.length() - 1);
                 }
             }
+            if (term instanceof Tree.ModuleLiteral) {
+                Tree.ModuleLiteral ml = (Tree.ModuleLiteral) term;
+                Tree.ImportPath importPath = ml.getImportPath();
+                result = importPath==null || importPath.getIdentifiers().isEmpty() ? 
+                        unit.getPackage().getModule().getNameAsString() :
+                        formatPath(importPath.getIdentifiers());
+            }
         }
         return result;
+    }
+
+    private static Tree.Expression getAnnotationArgumentExpression(
+            Tree.Annotation ann, int index) {
+        
+        Tree.PositionalArgumentList pal = 
+                ann.getPositionalArgumentList();
+        if (pal!=null) {
+            List<Tree.PositionalArgument> args = 
+                    pal.getPositionalArguments();
+            if (args.size()>index) {
+                Tree.PositionalArgument arg = args.get(index);
+                if (arg instanceof Tree.ListedArgument) {
+                    Tree.ListedArgument la = 
+                            (Tree.ListedArgument) arg;
+                    return la.getExpression();
+                }
+            }
+        }
+        
+        Tree.NamedArgumentList nal = 
+                ann.getNamedArgumentList();
+        if (nal!=null) {
+            List<Tree.NamedArgument> args = 
+                    nal.getNamedArguments();
+            if (args.size()>index) {
+                Tree.SpecifiedArgument arg = 
+                        (Tree.SpecifiedArgument)
+                            args.get(index);
+                return arg.getSpecifierExpression()
+                        .getExpression();
+            }
+        }
+        
+        return null;
+    }
+    
+    public static void setRestrictionArgument(Tree.Annotation ann, 
+            int index, Unit unit) {
+        Tree.Expression expression = 
+                getAnnotationArgumentExpression(ann, index);
+        if (expression!=null) {
+            Tree.Term term = expression.getTerm();
+            if (term instanceof Tree.ModuleLiteral) {
+                Tree.ModuleLiteral ml = (Tree.ModuleLiteral) term;
+                ml.setRestriction(true);
+            }
+        }
     }
     
     public static boolean isForUnsupportedBackend(Tree.AnnotationList al,
@@ -156,7 +184,7 @@ public class TreeUtil {
                 backends = Backends.HEADER;
             } else {
                 for (int i=0; i<cnt; i++) {
-                    String be = getAnnotationArgument(ann, i);
+                    String be = getAnnotationArgument(ann, i, unit);
                     if (be != null) {
                         backends = backends.merged(Backend.fromAnnotation(be));
                     }

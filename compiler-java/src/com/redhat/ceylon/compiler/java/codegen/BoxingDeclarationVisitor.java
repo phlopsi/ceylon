@@ -20,6 +20,8 @@
 
 package com.redhat.ceylon.compiler.java.codegen;
 
+import static com.redhat.ceylon.compiler.java.codegen.AbstractTransformer.isPinnedType;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -221,8 +223,7 @@ public abstract class BoxingDeclarationVisitor extends Visitor {
             }
         }
         decl.setTypeErased(erased);
-        if ("com.redhat.ceylon.compiler.java.test.structure.klass::IterableSequence.sequence".equals(decl.getQualifiedNameString())
-                || "ceylon.language::Iterable.sequence".equals(decl.getQualifiedNameString())) {
+        if (isPinnedType(decl)) {
             untrusted = true;
         }
         decl.setUntrustedType(untrusted);
@@ -352,6 +353,11 @@ public abstract class BoxingDeclarationVisitor extends Visitor {
            && (refinedDeclaration.getContainer() instanceof Declaration == false || !CodegenUtil.isContainerFunctionalParameter(refinedDeclaration))
            && !(refinedDeclaration instanceof Functional && Decl.isMpl((Functional)refinedDeclaration))){
             boolean unbox = !forceBoxedLocals || !(declaration instanceof Value) || !Decl.isLocal(declaration) || Decl.isParameter(declaration) || Decl.isTransient(declaration);
+            // if we're a synthetic variable with unchecked nulls, don't force the null check
+            // until it's used later by user code
+            if(declaration.getOriginalDeclaration() != null
+                    && declaration.hasUncheckedNullType())
+                unbox = false;
             declaration.setUnboxed(unbox);
         } else if (Decl.isValueParameter(declaration)
                 && CodegenUtil.isContainerFunctionalParameter(declaration)

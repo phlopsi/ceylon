@@ -1,21 +1,7 @@
 package com.redhat.ceylon.model.loader.model;
 
-import com.redhat.ceylon.common.Backends;
-import com.redhat.ceylon.common.JVMModuleUtil;
-import com.redhat.ceylon.common.NonNull;
-import com.redhat.ceylon.model.loader.AbstractModelLoader;
-import com.redhat.ceylon.model.loader.ModelLoader.DeclarationType;
-import com.redhat.ceylon.model.loader.NamingBase;
-import com.redhat.ceylon.model.loader.mirror.ClassMirror;
-import com.redhat.ceylon.model.typechecker.model.Class;
-import com.redhat.ceylon.model.typechecker.model.Declaration;
-import com.redhat.ceylon.model.typechecker.model.LanguageModuleCache;
-import com.redhat.ceylon.model.typechecker.model.Module;
-import com.redhat.ceylon.model.typechecker.model.NothingType;
-import com.redhat.ceylon.model.typechecker.model.Package;
-import com.redhat.ceylon.model.typechecker.model.Type;
-import com.redhat.ceylon.model.typechecker.model.TypeDeclaration;
-import com.redhat.ceylon.model.typechecker.model.Unit;
+import static com.redhat.ceylon.model.typechecker.model.ModelUtil.lookupMember;
+import static com.redhat.ceylon.model.typechecker.model.ModelUtil.lookupMemberForBackend;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,8 +13,22 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
-import static com.redhat.ceylon.model.typechecker.model.ModelUtil.lookupMember;
-import static com.redhat.ceylon.model.typechecker.model.ModelUtil.lookupMemberForBackend;
+import com.redhat.ceylon.common.Backends;
+import com.redhat.ceylon.common.JVMModuleUtil;
+import com.redhat.ceylon.model.loader.AbstractModelLoader;
+import com.redhat.ceylon.model.loader.ModelLoader.DeclarationType;
+import com.redhat.ceylon.model.loader.NamingBase;
+import com.redhat.ceylon.model.loader.mirror.ClassMirror;
+import com.redhat.ceylon.model.typechecker.model.Class;
+import com.redhat.ceylon.model.typechecker.model.Declaration;
+import com.redhat.ceylon.model.typechecker.model.LanguageModuleCache;
+import com.redhat.ceylon.model.typechecker.model.ModelUtil;
+import com.redhat.ceylon.model.typechecker.model.Module;
+import com.redhat.ceylon.model.typechecker.model.NothingType;
+import com.redhat.ceylon.model.typechecker.model.Package;
+import com.redhat.ceylon.model.typechecker.model.Type;
+import com.redhat.ceylon.model.typechecker.model.TypeDeclaration;
+import com.redhat.ceylon.model.typechecker.model.Unit;
 
 /**
  * Represents a lazy Package declaration.
@@ -72,7 +72,8 @@ public class LazyPackage extends Package {
     
     private Declaration getDirectMember(String name, List<Type> signature, boolean ellipsis, boolean tryAlternates) {
 //        System.err.println("getMember "+name+" "+signature+" "+ellipsis);
-        boolean canCache = (signature == null && !ellipsis);
+
+        boolean canCache = signature == null && !ellipsis;
         if(canCache){
             if(cache.containsKey(name)) {
                 Declaration cachedDeclaration = cache.get(name);
@@ -120,7 +121,8 @@ public class LazyPackage extends Package {
 
                 // only get it from the classpath if we're not compiling it, unless
                 // it happens to be a java source
-                if(classSymbol != null && (!classSymbol.isLoadedFromSource() || classSymbol.isJavaSource())) {
+                if(classSymbol != null 
+                        && (!classSymbol.isLoadedFromSource() || classSymbol.isJavaSource())) {
                     d = modelLoader.convertToDeclaration(module, className, DeclarationType.VALUE);
                     if (d instanceof Class) {
                         Class c = (Class) d;
@@ -134,10 +136,10 @@ public class LazyPackage extends Package {
                     }
                     // if we're not looking for a backend, or we found the right backend, fine
                     // if not, keep looking
-                    if (d != null && isForBackend(d, backends))
+                    if (d != null && ModelUtil.isForBackend(d, backends))
                         return d;
                 }
-                d = getDirectMemberFromSource(name, backends);
+                d = getDirectMemberFromSource(name, signature, ellipsis, backends);
                 
                 if (d == null
                         && tryAlternates
@@ -188,28 +190,15 @@ public class LazyPackage extends Package {
         });
     }
 
-    private boolean isForBackend(@NonNull Declaration d, @NonNull Backends backends) {
-        return backends.none() 
-                || d.getNativeBackends().none() 
-                || backends.supports(d.getNativeBackends());
-    }
-
-    public Declaration getDirectMemberFromSource(String name, Backends backends) {
-        for (Declaration d: super.getMembers()) {
-            if (com.redhat.ceylon.model.typechecker.model.ModelUtil.isResolvable(d) /* && d.isShared() */ 
-            && com.redhat.ceylon.model.typechecker.model.ModelUtil.isNamed(name, d)
-            && isForBackend(d, backends)) {
-                return d;
-            }
-        }
-        return null;
+    public Declaration getDirectMemberFromSource(String name, List<Type> signature, boolean ellipsis, Backends backends) {
+        List<Declaration> sourceDeclarations = super.getMembers();
+        return lookupMember(sourceDeclarations, name, signature, ellipsis, false, backends);
     }
 
     public String getQualifiedName(final String pkgName, String name) {
         // no need to quote the name itself as java keywords are lower-cased and we append a _ to every
         // lower-case toplevel so they can never be java keywords
-        String className = pkgName.isEmpty() ? name : JVMModuleUtil.quoteJavaKeywords(pkgName) + "." + name;
-        return className;
+        return pkgName.isEmpty() ? name : JVMModuleUtil.quoteJavaKeywords(pkgName) + "." + name;
     }
     
     // FIXME: This is only here for wildcard imports, and we should be able to make it lazy like the rest

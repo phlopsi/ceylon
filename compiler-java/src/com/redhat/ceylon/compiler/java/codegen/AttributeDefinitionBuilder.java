@@ -20,6 +20,8 @@
 
 package com.redhat.ceylon.compiler.java.codegen;
 
+import static com.redhat.ceylon.model.loader.NamingBase.getJavaAttributeName;
+
 import com.redhat.ceylon.compiler.java.codegen.AbstractTransformer.BoxingStrategy;
 import com.redhat.ceylon.compiler.java.codegen.Naming.SyntheticName;
 import com.redhat.ceylon.compiler.java.codegen.recovery.HasErrorException;
@@ -152,7 +154,7 @@ public class AttributeDefinitionBuilder {
                 .modelAnnotations(attrType.getAnnotations())
                 .resultType(attrType(), attrType);
             ParameterDefinitionBuilder pdb = ParameterDefinitionBuilder.systemParameter(owner, setterParameterName());
-            pdb.at(node);
+//            pdb.at(node);
             pdb.modifiers(Flags.FINAL);
             pdb.aliasName(setterParameterName());
             int seterParamFlags = 0;
@@ -220,7 +222,7 @@ public class AttributeDefinitionBuilder {
                         attrAndFieldName, attrAndFieldName, false, false, false, false, memoizedInitialiValue);
         if (!"ref".equals(getterName)
                 && !"get_".equals(getterName)
-                && !attrType.getName().equals(NamingBase.getJavaAttributeName(getterName))
+                && !attrType.getName().equals(getJavaAttributeName(getterName))
                 && attrType.isShared()
                 && !Decl.isValueConstructor(attrType)) {
             adb.getterBuilder.realName(attrType.getName());
@@ -349,7 +351,7 @@ public class AttributeDefinitionBuilder {
         if (hasField) {
             if (initialException == null) {
                 // the value, init flag and exception fields
-                defs.appendList((List)makeFields());
+                defs.appendList(AbstractTransformer.upcastList(makeFields()));
                 if(initialValue != null) {
                     long flags = (modifiers & Flags.STATIC);
                     defs.append(owner.make().Block(flags, makeInit(true)));

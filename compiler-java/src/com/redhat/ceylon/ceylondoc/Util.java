@@ -70,6 +70,7 @@ public class Util {
     
     private static final Set<String> ABBREVIATED_TYPES = new HashSet<String>();
     static {
+        ABBREVIATED_TYPES.add("ceylon.language::Callable");
         ABBREVIATED_TYPES.add("ceylon.language::Empty");
         ABBREVIATED_TYPES.add("ceylon.language::Entry");
         ABBREVIATED_TYPES.add("ceylon.language::Sequence");
@@ -470,14 +471,7 @@ public class Util {
     }
     
     public static boolean isThrowable(TypeDeclaration c) {
-        if (c instanceof Class) {
-            if ("ceylon.language::Throwable".equals(c.getQualifiedNameString())) {
-                return true;
-            } else if (c.getExtendedType()!=null) {
-                return isThrowable(c.getExtendedType().getDeclaration());
-            }
-        }
-        return false;
+        return c.inherits(c.getUnit().getThrowableDeclaration());
     }  
 
     public static String getUnitPackageName(PhasedUnit unit) {

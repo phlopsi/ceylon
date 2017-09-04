@@ -29,7 +29,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.redhat.ceylon.cmr.api.AbstractDependencyResolver;
-import com.redhat.ceylon.cmr.api.ArtifactContext;
 import com.redhat.ceylon.cmr.api.DependencyContext;
 import com.redhat.ceylon.cmr.api.DependencyResolver;
 import com.redhat.ceylon.cmr.api.ModuleDependencyInfo;
@@ -52,7 +51,7 @@ public class OSGiDependencyResolver extends AbstractDependencyResolver {
         if (context.ignoreInner() == false) {
             ArtifactResult result = context.result();
             File mod = result.artifact();
-            if (mod != null && mod.getName().toLowerCase().endsWith(ArtifactContext.JAR)) {
+            if (mod != null && IOUtils.isZipFile(mod)) {
                 InputStream stream = IOUtils.findDescriptor(result, JarFile.MANIFEST_NAME);
                 if (stream != null) {
                     try {
@@ -111,10 +110,11 @@ public class OSGiDependencyResolver extends AbstractDependencyResolver {
         for (String bundle : bundles) {
             infos.add(parseModuleInfo(bundle));
         }
-        ModuleInfo ret = new ModuleInfo(name, version,
+        ModuleInfo ret = new ModuleInfo(null, name, version,
                 // FIXME: does OSGi store this?
                 ModuleUtil.getMavenGroupIdIfMavenModule(name),
                 ModuleUtil.getMavenArtifactIdIfMavenModule(name),
+                ModuleUtil.getMavenClassifierIfMavenModule(name),
                 null, infos);
         if(overrides != null)
             ret = overrides.applyOverrides(name, version, ret);

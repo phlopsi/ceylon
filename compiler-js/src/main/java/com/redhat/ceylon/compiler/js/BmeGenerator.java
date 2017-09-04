@@ -7,7 +7,6 @@ import java.util.Map;
 
 import com.redhat.ceylon.common.Backend;
 import com.redhat.ceylon.compiler.js.GenerateJsVisitor.GenerateCallback;
-import com.redhat.ceylon.compiler.js.util.JsWriter;
 import com.redhat.ceylon.compiler.js.util.TypeUtils;
 import com.redhat.ceylon.compiler.typechecker.tree.Node;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree;
@@ -30,6 +29,10 @@ import com.redhat.ceylon.model.typechecker.model.Value;
 public class BmeGenerator {
 
     static void generateBme(final Tree.BaseMemberExpression bme, final GenerateJsVisitor gen) {
+        generateBme(bme, gen, true);
+    }
+    static void generateBme(final Tree.BaseMemberExpression bme, final GenerateJsVisitor gen,
+                            boolean nonNull) {
         final boolean forInvoke = bme.getDirectlyInvoked();
         Declaration decl = bme.getDeclaration();
         if (decl != null) {
@@ -43,7 +46,7 @@ public class BmeGenerator {
                     return;
                 }
             }
-            if (TypeUtils.isConstructor(decl)) {
+            if (ModelUtil.isConstructor(decl)) {
                 Constructor cd = TypeUtils.getConstructor(decl);
                 Declaration cdc = (Declaration)cd.getContainer();
                 if (!gen.qualify(bme, cd)) {
@@ -64,10 +67,12 @@ public class BmeGenerator {
         if (decl == null && gen.isInDynamicBlock()) {
             if ("undefined".equals(exp)) {
                 gen.out(exp);
-            } else {
+            } else if (nonNull) {
                 gen.out("(typeof ", exp, "==='undefined'||", exp, "===null?");
                 gen.generateThrow(null, "Undefined or null reference: " + exp, bme);
                 gen.out(":", exp, ")");
+            } else {
+                gen.out(exp);
             }
         } else {
             final boolean isCallable = !forInvoke && (decl instanceof Functional
@@ -109,11 +114,11 @@ public class BmeGenerator {
         List<TypeParameter> tparams = null;
         Declaration declaration = expr.getDeclaration();
         if (declaration instanceof Generic) {
-            tparams = ((Generic)declaration).getTypeParameters();
+            tparams = declaration.getTypeParameters();
         }
-        else if (declaration instanceof TypedDeclaration &&
-                ((TypedDeclaration)declaration).getType()!=null &&
-                ((TypedDeclaration)declaration).getType().isTypeConstructor()) {
+        else if (declaration instanceof TypedDeclaration 
+                && ((TypedDeclaration)declaration).getType()!=null 
+                && ((TypedDeclaration)declaration).getType().isTypeConstructor()) {
             tparams = ((TypedDeclaration)declaration).getType().getDeclaration().getTypeParameters();
         }
         else {
@@ -214,7 +219,7 @@ public class BmeGenerator {
             }
             if (dyncall) {
                 gen.out(".", that.getIdentifier().getText());
-            } else if (TypeUtils.isConstructor(d)) {
+            } else if (ModelUtil.isConstructor(d)) {
                 gen.out(gen.getNames().constructorSeparator(d),
                         gen.getNames().name(d));
             } else {
@@ -242,17 +247,16 @@ public class BmeGenerator {
             boolean wrap = false;
             String pname = null;
             List<Parameter> params = null;
-            TypeDeclaration td = null;
-            if ((forceReference || !that.getDirectlyInvoked()) && d instanceof TypeDeclaration) {
-                td = (TypeDeclaration)d;
-                if (td.getTypeParameters() != null && td.getTypeParameters().size() > 0) {
+            if ((forceReference || !that.getDirectlyInvoked()) 
+                    && d instanceof TypeDeclaration) {
+                if (d.isParameterized()) {
                     wrap = true;
                     pname = gen.getNames().createTempVariable();
                     gen.out("function(");
-                    if (td instanceof Class) {
-                        params = ((Class)td).getParameterList().getParameters();
-                    } else if (td instanceof Constructor) {
-                        params = ((Constructor)td).getFirstParameterList().getParameters();
+                    if (d instanceof Class) {
+                        params = ((Class)d).getParameterList().getParameters();
+                    } else if (d instanceof Constructor) {
+                        params = ((Constructor)d).getFirstParameterList().getParameters();
                     }
                     for (int i=0;i<params.size(); i++) {
                         if (i>0)gen.out(",");
@@ -284,8 +288,10 @@ public class BmeGenerator {
                 }
                 List<Type> targs = that.getTypeArguments() == null ? null :
                     that.getTypeArguments().getTypeModels();
-                TypeUtils.printTypeArguments(that, TypeUtils.matchTypeParametersWithArguments(
-                        td.getTypeParameters(), targs), gen, false, null);
+                TypeUtils.printTypeArguments(that, 
+                        TypeUtils.matchTypeParametersWithArguments(
+                                d.getTypeParameters(), targs), 
+                        gen, false, null);
                 gen.out(");}");
             }
         }

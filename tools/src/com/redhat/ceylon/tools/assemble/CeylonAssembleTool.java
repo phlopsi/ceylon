@@ -26,6 +26,7 @@ import com.redhat.ceylon.cmr.api.ArtifactContext;
 import com.redhat.ceylon.cmr.api.ModuleQuery;
 import com.redhat.ceylon.cmr.ceylon.loader.ModuleGraph;
 import com.redhat.ceylon.cmr.impl.IOUtils;
+import com.redhat.ceylon.cmr.impl.MavenRepository;
 import com.redhat.ceylon.common.BooleanUtil;
 import com.redhat.ceylon.common.Constants;
 import com.redhat.ceylon.common.FileUtil;
@@ -65,6 +66,7 @@ public class CeylonAssembleTool extends ModuleLoadingTool {
     private Boolean js;
     private Boolean dart;
     
+    private String[] loaderSuffixes;
     private String[] assemblySuffixes;
     private ModuleQuery.Type mqt;
     
@@ -160,42 +162,62 @@ public class CeylonAssembleTool extends ModuleLoadingTool {
 
     @Override
     protected String[] getLoaderSuffixes() {
-        return assemblySuffixes;
+        return loaderSuffixes;
     }
     
     @Override
     public void initialize(CeylonTool mainTool) throws Exception {
         // Determine the artifacts we'll include in the assembly
-        mqt = ModuleQuery.Type.JVM;
-        ArrayList<String> sfx = new ArrayList<String>();
         boolean defaults = js == null 
                 && jvm == null
                 && dart == null;
-        if (BooleanUtil.isTrue(dart) || defaults) {
-            sfx.add(ArtifactContext.DART);
-            sfx.add(ArtifactContext.DART_MODEL);
-            sfx.add(ArtifactContext.RESOURCES);
+        mqt = ModuleQuery.Type.JVM;
+        if (BooleanUtil.isTrue(dart)) {
             mqt = ModuleQuery.Type.DART;
         }
-        if (BooleanUtil.isTrue(js) || defaults) {
-            sfx.add(ArtifactContext.JS);
-            sfx.add(ArtifactContext.JS_MODEL);
-            sfx.add(ArtifactContext.RESOURCES);
+        if (BooleanUtil.isTrue(js)) {
             mqt = ModuleQuery.Type.JS;
         }
         if (BooleanUtil.isTrue(jvm) || defaults) {
-            // put the CAR first since its presence will shortcut the other three
-            sfx.add(ArtifactContext.CAR);
-            sfx.add(ArtifactContext.JAR);
-            sfx.add(ArtifactContext.MODULE_PROPERTIES);
-            sfx.add(ArtifactContext.MODULE_XML);
             mqt = ModuleQuery.Type.JVM;
         }
-        assemblySuffixes = sfx.toArray(new String[] {});
+        loaderSuffixes = listSuffixes(true);
+        assemblySuffixes = listSuffixes(false);
         
         super.initialize(mainTool);
     }
 
+    private String[] listSuffixes(boolean codeOnly) {
+        ArrayList<String> sfx = new ArrayList<String>();
+        boolean defaults = js == null 
+                && jvm == null
+                && dart == null;
+        if (BooleanUtil.isTrue(jvm) || defaults) {
+            // put the CAR first since its presence will shortcut the others
+            sfx.add(ArtifactContext.CAR);
+            sfx.add(ArtifactContext.JAR);
+            if (!codeOnly) {
+                sfx.add(ArtifactContext.MODULE_PROPERTIES);
+                sfx.add(ArtifactContext.MODULE_XML);
+            }
+        }
+        if (BooleanUtil.isTrue(js) || defaults) {
+            sfx.add(ArtifactContext.JS);
+            sfx.add(ArtifactContext.JS_MODEL);
+            if (!codeOnly) {
+                sfx.add(ArtifactContext.RESOURCES);
+            }
+        }
+        if (BooleanUtil.isTrue(dart) || defaults) {
+            sfx.add(ArtifactContext.DART);
+            sfx.add(ArtifactContext.DART_MODEL);
+            if (!codeOnly) {
+                sfx.add(ArtifactContext.RESOURCES);
+            }
+        }
+        return sfx.toArray(new String[] {});
+    }
+    
     @Override
     public void run() throws Exception {
         if (includeRuntime) {
@@ -227,6 +249,7 @@ public class CeylonAssembleTool extends ModuleLoadingTool {
         }
         if (includeRuntime) {
             loadModule(null, "ceylon.runtime", Versions.CEYLON_VERSION_NUMBER);
+            loadModule(null, "com.redhat.ceylon.module-resolver-aether", Versions.CEYLON_VERSION_NUMBER);
         }
         loader.resolve();
         String versionSuffix = firstModuleVersion != null && !firstModuleVersion.isEmpty()
@@ -309,7 +332,7 @@ public class CeylonAssembleTool extends ModuleLoadingTool {
                                         String name = "modules/" + moduleToPath(module.name) + "/" + module.version + "/" + ar.artifact().getName();
                                         addEntry(zipFile, ar.artifact(), name);
                                     }
-                                } else if (module.artifact.namespace().equals("maven")) {
+                                } else if (module.artifact.namespace().equals(MavenRepository.NAMESPACE)) {
                                     String name = "maven/" + moduleToPath(module.name) + "/" + module.version + "/" + file.getName();
                                     addEntry(zipFile, file, name);
                                     // Copy the Maven artifact's pom file as well
@@ -373,13 +396,14 @@ public class CeylonAssembleTool extends ModuleLoadingTool {
 
     @Override
     protected boolean shouldExclude(String moduleName, String version) {
-        return super.shouldExclude(moduleName, version) ||
-                this.excludedModules.contains(moduleName) ||
-                (!includeLanguage && "ceylon.language".equals(moduleName));
+        return super.shouldExclude(moduleName, version) 
+            || this.excludedModules.contains(moduleName) 
+            || !includeLanguage && "ceylon.language".equals(moduleName);
     }
     
     private File getOverridesFile() {
-        String path = (overrides != null) ? overrides : DefaultToolOptions.getDefaultOverrides();
+        String path = overrides != null ? overrides : 
+            DefaultToolOptions.getDefaultOverrides();
         if (path != null) {
             return applyCwd(new File(path));
         }

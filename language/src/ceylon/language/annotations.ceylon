@@ -20,7 +20,7 @@ shared final sealed annotation class AnnotationAnnotation()
 
 "Annotation to mark a class as an *annotation class*, or a 
  top-level function as an *annotation constructor*."
-see (`interface Annotation`)
+see (interface Annotation)
 shared annotation AnnotationAnnotation annotation()
         => AnnotationAnnotation();
 
@@ -37,6 +37,27 @@ shared final sealed annotation class SharedAnnotation()
  it is declared."
 shared annotation SharedAnnotation shared()
         => SharedAnnotation();
+
+"The annotation class for the [[restricted]] annotation."
+since("1.3.3")
+shared final sealed annotation class RestrictedAnnotation(
+    "The modules to which this declaration is visible."
+    Module* modules)
+        satisfies OptionalAnnotation<RestrictedAnnotation,
+                    FunctionOrValueDeclaration
+                  | ClassOrInterfaceDeclaration
+                  | ConstructorDeclaration
+                  | Package> {}
+
+"Annotation to restrict the visibility of a declaration or
+ package to a given list of [[modules]]. If no modules are 
+ specified, a `restricted` declaration is only visible 
+ within the package in which it is defined."
+since("1.3.3")
+shared annotation RestrictedAnnotation restricted(
+    "The modules to which this declaration is visible."
+    Module* modules)
+        => RestrictedAnnotation(*modules);
 
 "The annotation class for the [[variable]] annotation."
 shared final sealed annotation class VariableAnnotation()
@@ -214,8 +235,8 @@ shared annotation LateAnnotation late()
 "The annotation class for the [[native]] annotation."
 shared final sealed annotation class NativeAnnotation(backends)
         satisfies OptionalAnnotation<NativeAnnotation> {
-    "The compiler backend that this native annotation applies 
-     to, or the empty string to declare the annotated element 
+    "The compiler backend(s) that this native annotation applies 
+     to, or the empty sequence to declare the annotated element 
      is a native header."
     since("1.2.0")
     shared String* backends;
@@ -322,7 +343,7 @@ shared final sealed annotation class ThrownExceptionAnnotation(
 "Annotation to document the exception types thrown by a 
  function, value, class, or constructor.
  
-     throws(`class Exception`)
+     throws(class Exception)
      void die() { throw; }"
 shared annotation ThrownExceptionAnnotation throws(
     "The [[Exception]] type that is thrown."
@@ -397,6 +418,21 @@ shared annotation LicenseAnnotation license(
     String description)
         => LicenseAnnotation(description);
 
+"The annotation class for the [[label]] annotation."
+since("1.4.0")
+shared final sealed annotation class LabelAnnotation(
+	"The readable name of the module."
+	shared String name)
+		satisfies OptionalAnnotation<LabelAnnotation,
+					Module> {}
+
+"Annotation to specify the readable name of a module."
+since("1.4.0")
+shared annotation LabelAnnotation label(
+	"The readable name of the module."
+	String name)
+		=> LabelAnnotation(name);
+
 "The annotation class for the [[since]] annotation."
 since("1.3.0")
 shared final sealed annotation class SinceAnnotation(
@@ -458,7 +494,8 @@ shared annotation SuppressWarningsAnnotation suppressWarnings(
      `unusedImport`,
      `redundantImportAlias`,
      `ceylonNamespace`,
-     `javaNamespace,` 
+     `javaNamespace`, 
+     `packageName`,
      `hidesLanguageModifier`,
      `suppressedAlready`, 
      `suppressesNothing`, 

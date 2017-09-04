@@ -239,7 +239,38 @@ shared void testIterables() {
     check(Array([]).chain({1,2}).sequence()==[1,2], "EmptyArray.chain");
     check(Array{1,2}.chain({3,4}).sequence()=={1,2,3,4}.sequence(), "NonemptyArray.chain");
     check(Singleton(1).chain(Singleton(2)).chain(Singleton("3")).sequence()=={1,2,"3"}.sequence(), "Singletons.chain");
-    
+    check(!{1}.chain({}).empty, "iterable chain opt #1");
+    check(!{}.chain({1}).empty, "iterable chain opt #2");
+    check({}.chain({}).empty, "iterable chain opt #3");
+    check({}.chain({}).size == 0, "iterable chain opt #4");
+    check({1}.chain({}).size == 1, "iterable chain opt #5");
+    check({}.chain({1}).size == 1, "iterable chain opt #6");
+    check({1,2}.chain({1,2,3}).size == 5, "iterable chain opt #7");
+    check(!{1,2}.chain({3,4}).any(5.equals), "iterable chain opt #8");
+    check({1,2}.chain({3,4}).any(2.equals), "iterable chain opt #9");
+    check({1,2}.chain({3,4}).any(4.equals), "iterable chain opt #10");
+    check(!{1,2}.chain({3,4}).contains(5), "iterable chain opt #11");
+    check({1,2}.chain({3,4}).contains(1), "iterable chain opt #12");
+    check({1,2}.chain({3,4}).contains(3), "iterable chain opt #13");
+    check({1,1}.chain({2,2,2}).count(1.equals) == 2, "iterable chain opt #14");
+    check({1,1}.chain({2,2,2}).count(2.equals) == 3, "iterable chain opt #15");
+    variable value total = 0;
+    {2,2}.chain({2,2,2}).each((i) => total += i);
+    check(total == 10, "iterable chain opt #16");
+    check(!{2,2}.chain({3,3}).every(3.largerThan), "iterable chain opt #17");
+    check(!{3,3}.chain({2,2}).every(3.largerThan), "iterable chain opt #18");
+    check({3,3}.chain({2,2}).every(4.largerThan), "iterable chain opt #19");
+    check({1,2}.chain({3,4}).find(1.equals) exists, "iterable chain opt #20");
+    check({1,2}.chain({3,4}).find(3.equals) exists, "iterable chain opt #21");
+    check(!{1,2}.chain({3,4}).find(5.equals) exists, "iterable chain opt #22");
+    check({1,2}.chain({3,4}).findLast(1.equals) exists, "iterable chain opt #23");
+    check({1,2}.chain({3,4}).findLast(3.equals) exists, "iterable chain opt #24");
+    check(!{1,2}.chain({3,4}).findLast(5.equals) exists, "iterable chain opt #25");
+    check(eq({1,2}.chain({3,4}).locate(2.equals), 1->2), "iterable chain opt #26");
+    check(eq({1,2}.chain({3,4}).locate(4.equals), 3->4), "iterable chain opt #27");
+    check(eq({1,2}.chain({3,4}).locateLast(2.equals), 1->2), "iterable chain opt #28");
+    check(eq({1,2}.chain({3,4}).locateLast(4.equals), 3->4), "iterable chain opt #29");
+
     check({}.follow("a").sequence()=={"a"}.sequence(), "Sequence.follow(a) ``{}.follow("a")``");
     check({"b"}.follow("a").sequence()=={"a", "b"}.sequence(), "Sequence.follow(a), 2 ``{"b"}.follow("a")``");
 
@@ -266,9 +297,9 @@ shared void testIterables() {
 	value ia = {};
 	value ib = { 1, 2, 3, 4, 5 };
 	value ic = { 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5 };
-	value ix = mapPairs(plus<Integer>, ia, ia);
-	{Integer+} iy = mapPairs(plus<Integer>, ib, ib);
-	{Integer+} iz = mapPairs(plus<Integer>, ic, ic);
+	value ix = mapPairs(ia, ia, plus<Integer>);
+	{Integer+} iy = mapPairs(ib, ib, plus<Integer>);
+	{Integer+} iz = mapPairs(ic, ic, plus<Integer>);
     check(ix.string=="{}", "Iterable.string [1]");
     check(iy.string=="{ 2, 4, 6, 8, 10 }", "Iterable.string [2]");
     check(iz.string=="{ 2, 4, 6, 8, 10, 2, 4, 6, 8, 10, 2, 4, 6, 8, 10, 2, 4, 6, 8, 10, 2, 4, 6, 8, 10, 2, 4, 6, 8, 10, ... }", "Iterable.string [3]");
@@ -276,8 +307,7 @@ shared void testIterables() {
     //Iterable-related functions
     check({"aaa", "tt", "z"}.sort(byIncreasing((String s) => s.size)).sequence()=={"z","tt","aaa"}.sequence(), "sort(byIncreasing)");
     check({"z", "aaa", "tt"}.sort(byDecreasing((String s) => s.size)).sequence()=={"aaa","tt","z"}.sequence(), "sort(byDecreasing)");
-    Iterable<String> combined = mapPairs((Character c, Integer i) => "comb ``c``+``i``",
-                                               "hello", { 1,2,3,4 });
+    Iterable<String> combined = mapPairs( "hello", { 1,2,3,4 }, (Character c, Integer i) => "comb ``c``+``i``");
     check(combined.sequence().size==4, "combine [1]");
     check(combined.sequence() == { "comb h+1", "comb e+2", "comb l+3", "comb l+4" }.sequence(), "combine [2]");
     
@@ -335,20 +365,18 @@ shared void testIterables() {
     //check((1..3).spread((Integer i)(Float f) => i*f)(1.0).sequence()==[1.0,2.0,3.0], "range spread");
     check((1..3).spread(Integer.times)(2).sequence()==[2,4,6], "range spread");
     
-    check(corresponding(1..5,
-        loop(0)(Integer.successor).takeWhile(5.largerThan), 
-        (Integer x, Integer y)=>x==y+1),"corresponding");
-    check(!corresponding((1..5).withTrailing(1),
-        (1..5).withTrailing(0), 
-        (Integer x, Integer y)=>x==y),"corresponding");
+    check(corresponding(1..5, loop(0)(Integer.successor).takeWhile(5.largerThan))
+        ((x, y)=>x==y+1),"corresponding");
+    check(!corresponding((1..5).withTrailing(1), (1..5).withTrailing(0))
+        ((x, y)=>x==y),"corresponding");
     
-    check(foldPairs(1, (Integer r, Integer f, Integer s)=>r+f+s, 1..3, 3..1)==13, "foldPairs");
-    check((findPair((Integer f, Integer s) => f==s, 1..3, 3..1) else -1) == [2,2], "findPair");
-    check(mapPairs((Integer f, Integer s) => f+s, 1..3, 3..1).sequence()==[4,4,4], "mapPairs");
-    check(anyPair((Integer f, Integer s) => f==s, 1..3, 3..1), "anyPair");
-    check(!anyPair((Integer f, Integer s) => f==s, 1..2, 3..4), "not anyPair");
-    check(!everyPair((Integer f, Integer s) => f==s, 1..3, 3..1), "not everyPair");
-    check(everyPair((Integer f, Integer s) => f==s, 1..3, 1..3), "everyPair");
+    check(mapPairs(1..3, 3..1, (Integer f, Integer s) => f+s).sequence()==[4,4,4], "mapPairs");
+    check(foldPairs(1..3, 3..1, 1)((r, f, s)=>r+f+s)==13, "foldPairs");
+    check((findPair(1..3, 3..1)((f, s) => f==s) else -1) == [2,2], "findPair");
+    check(anyPair(1..3, 3..1)((f, s) => f==s), "anyPair");
+    check(!anyPair(1..2, 3..4)((f, s) => f==s), "not anyPair");
+    check(!everyPair(1..3, 3..1)((f, s) => f==s), "not everyPair");
+    check(everyPair(1..3, 1..3)((f, s) => f==s), "everyPair");
     check(zipPairs(1..3, 3..1).sequence()==[[1,3],[2,2],[3,1]], "zipPairs");
     check(unzipPairs(zipPairs(1..3, 3..1)).spread(Iterable<Integer>.sequence)().sequence()==[[1,2,3],[3,2,1]], "unzipPairs");
     check(zipEntries(1..3, 3..1).sequence()==[1->3,2->2,3->1], "zipEntries");
@@ -417,4 +445,10 @@ shared void testIterables() {
     } catch (AssertionError e) {
         check(e.message == "nonempty Iterable with initial 'finished' element", "iterate {finished}");
     }
+    
+    check(transpose { padding=null; "hello", "world", 1..3 }.string
+      =="{ [h, w, 1], [e, o, 2], [l, r, 3], [l, l, <null>], [o, d, <null>] }", "transpose 1");
+    check(transpose { padding=null; [], [1] }.sequence()==[[null, 1]], "transpose 2");
+    check(transpose { padding=null; [], {}, ""}.empty, "transpose 3");
+    check(transpose { padding=null; }.empty, "transpose 4");
 }

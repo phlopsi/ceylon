@@ -25,7 +25,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import com.redhat.ceylon.cmr.api.AbstractDependencyResolver;
-import com.redhat.ceylon.cmr.api.ArtifactContext;
 import com.redhat.ceylon.cmr.api.DependencyContext;
 import com.redhat.ceylon.cmr.api.ModuleInfo;
 import com.redhat.ceylon.cmr.api.Overrides;
@@ -48,7 +47,7 @@ public abstract class ModulesDependencyResolver extends AbstractDependencyResolv
     public ModuleInfo resolve(DependencyContext context, Overrides overrides) {
         final ArtifactResult result = context.result();
         File mod = result.artifact();
-        if (mod != null && mod.getName().toLowerCase().endsWith(ArtifactContext.JAR)) {
+        if (mod != null && IOUtils.isZipFile(mod)) {
             if (context.ignoreInner() == false) {
                 String descriptorPath = getQualifiedMetaInfDescriptorName(result.name(), result.version());
                 final InputStream descriptor = IOUtils.findDescriptor(result, descriptorPath);
@@ -95,9 +94,11 @@ public abstract class ModulesDependencyResolver extends AbstractDependencyResolv
                         if(sep != -1){
                             String groupId = part.substring(0, sep);
                             String artifactId = part.substring(sep+1);
-                            return new ModuleInfo(ret.getName(), ret.getVersion(), 
-                                    groupId, artifactId,
-                                    ret.getFilter(), ret.getDependencies());
+                            return new ModuleInfo(ret.getNamespace(), 
+                            		ret.getName(), ret.getVersion(), 
+                                    groupId, artifactId, null,
+                                    ret.getFilter(), 
+                                    ret.getDependencies());
                         }
                     }
                 }

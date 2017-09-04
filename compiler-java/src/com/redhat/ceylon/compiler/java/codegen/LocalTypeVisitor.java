@@ -29,12 +29,15 @@ import com.redhat.ceylon.compiler.typechecker.tree.Node;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree.ClassDefinition;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree.Statement;
+import com.redhat.ceylon.compiler.typechecker.tree.Tree.Tuple;
 import com.redhat.ceylon.compiler.typechecker.tree.Visitor;
+import com.redhat.ceylon.compiler.typechecker.tree.Walker;
 import com.redhat.ceylon.model.typechecker.model.Class;
 import com.redhat.ceylon.model.typechecker.model.ClassOrInterface;
 import com.redhat.ceylon.model.typechecker.model.Declaration;
 import com.redhat.ceylon.model.typechecker.model.Function;
 import com.redhat.ceylon.model.typechecker.model.Interface;
+import com.redhat.ceylon.model.typechecker.model.ModelUtil;
 import com.redhat.ceylon.model.typechecker.model.Setter;
 import com.redhat.ceylon.model.typechecker.model.TypedDeclaration;
 import com.redhat.ceylon.model.typechecker.model.Value;
@@ -130,7 +133,7 @@ public class LocalTypeVisitor extends Visitor {
         if(stmt instanceof Tree.AttributeDeclaration
                 && ((Tree.AttributeDeclaration) stmt).getSpecifierOrInitializerExpression() instanceof Tree.LazySpecifierExpression){
             Value model = ((Tree.AttributeDeclaration) stmt).getDeclarationModel();
-            return !model.isCaptured() && !model.isShared();
+            return !ModelUtil.isCaptured(model);
         }
         if(stmt instanceof Tree.SpecifierStatement
             && ((Tree.SpecifierStatement) stmt).getSpecifierExpression() instanceof Tree.LazySpecifierExpression){
@@ -178,7 +181,7 @@ public class LocalTypeVisitor extends Visitor {
     }
 
     private boolean isMemberInInitialiser(Declaration model) {
-        if(model.isShared() || model.isCaptured())
+        if(ModelUtil.isCaptured(model))
             return false;
         if(model instanceof ClassOrInterface)
             return false;
@@ -248,8 +251,7 @@ public class LocalTypeVisitor extends Visitor {
         // stop at locals and private non-captured transient members which end up having a
         // locall getter for them
         if(!(model.isMember() 
-                && !model.isShared()
-                && !model.isCaptured()
+                && !ModelUtil.isCaptured(model)
                 && model.isTransient()))
             super.visit(that);
     }
@@ -390,10 +392,25 @@ public class LocalTypeVisitor extends Visitor {
         super.visit(that);
     }
 
+    /**
+     * Make sure we visit the sequenced argument knowing we're in a tuple, because
+     * those are not lazy
+     */
+    @Override
+    public void visit(Tuple node) {
+        Walker.walkAtom(this, node);
+        if (node.getSequencedArgument()!=null)
+            visit(node.getSequencedArgument(), true);
+    }
+
     @Override
     public void visit(Tree.SequencedArgument that) {
-        if (Strategy.useConstantIterable(that)) {
-            // In this case we use a constant iterable, and that isn't anonymous
+        visit(that, false);
+    }
+
+    private void visit(Tree.SequencedArgument that, boolean inTuple) {
+        if (Strategy.useConstantIterable(that) || inTuple) {
+            // In this case we use a constant iterable or tuple, and those are not anonymous
             super.visit(that);
             return;
         } 

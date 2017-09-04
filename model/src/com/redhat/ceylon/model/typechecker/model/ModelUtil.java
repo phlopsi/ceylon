@@ -5,7 +5,6 @@ import static com.redhat.ceylon.model.typechecker.model.SiteVariance.OUT;
 import static java.lang.Character.charCount;
 import static java.lang.Character.isLowerCase;
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 
@@ -20,6 +19,7 @@ import java.util.Set;
 
 import com.redhat.ceylon.common.Backend;
 import com.redhat.ceylon.common.Backends;
+import com.redhat.ceylon.common.NonNull;
 import com.redhat.ceylon.model.loader.model.LazyElement;
 
 
@@ -154,15 +154,26 @@ public class ModelUtil {
     public static Type appliedType(
             TypeDeclaration declaration, 
             Type... typeArguments) {
-        if (declaration==null) return null;
-        return declaration.appliedType(null, 
-                asList(typeArguments));
+        return declaration==null ? null : 
+            declaration.appliedType(null, 
+                    asList(typeArguments));
+    }
+
+    public static boolean isForBackend(@NonNull Declaration d, @NonNull Backends backends) {
+        return backends.none() 
+            || d.getNativeBackends().none() 
+            || backends.supports(d.getNativeBackends());
     }
 
     public static boolean isResolvable(Declaration declaration) {
-        return declaration.getName()!=null &&
-            !declaration.isSetter() && //return getters, not setters
-            !declaration.isAnonymous(); //don't return the type associated with an object dec 
+        return declaration.getName()!=null 
+            && !declaration.isSetter() //return getters, not setters
+            && !declaration.isAnonymous(); //don't return the type associated with an object dec 
+    }
+    
+    public static boolean isDefaultConstructor(Declaration d) {
+        return d instanceof Constructor 
+            && d.getName()==null;
     }
     
     public static boolean isAbstraction(Declaration d) {
@@ -170,13 +181,10 @@ public class ModelUtil {
     }
 
     public static boolean notOverloaded(Declaration d) {
-        if (d==null || !d.isFunctional()) {
-            return true;
-        }
-        else {
-            return !d.isOverloaded() 
-                 || d.isAbstraction();
-        }
+        return d==null
+            || !d.isFunctional()
+            || !d.isOverloaded() 
+            || d.isAbstraction();
     }
     
     public static boolean isOverloadedVersion(Declaration decl) {
@@ -207,9 +215,8 @@ public class ModelUtil {
             }
             Functional f = (Functional) dec;
             Unit unit = dec.getUnit();
-            List<ParameterList> pls = f.getParameterLists();
-            if (pls!=null && !pls.isEmpty()) {
-                ParameterList pl = pls.get(0);
+            ParameterList pl = f.getFirstParameterList();
+            if (pl!=null) {
                 List<Parameter> params = pl.getParameters();
                 int size = params.size();
                 boolean hasSeqParam = 
@@ -265,7 +272,7 @@ public class ModelUtil {
                     for (int i=size; i<sigSize; i++) {
                         if (variadic && i==sigSize-1) {
                             Type sdt = signature.get(i);
-                            Type isdt = 
+                            Type isdt = sdt==null ? null :
                                     unit.getIteratedType(sdt);
                             if (!matches(isdt, ipdt, unit)) {
                                 return false;
@@ -396,14 +403,6 @@ public class ModelUtil {
     
     static boolean isBetterMatch(Declaration d, Declaration r, 
             List<Type> signature, boolean variadic) {
-        //always prefer a non-coerced member 
-        //over a coerced one
-        if (!d.isCoercionPoint() && r.isCoercionPoint()) {
-            return true;
-        }
-        if (d.isCoercionPoint() && !r.isCoercionPoint()) {
-            return false;
-        }
         if (d instanceof Functional && 
             r instanceof Functional) {
             Functional df = (Functional) d;
@@ -944,7 +943,8 @@ public class ModelUtil {
     static TypeDeclaration erase(Type paramType, Unit unit) {
         paramType = paramType.resolveAliases();
         if (paramType.isTypeParameter()) {
-            if (paramType.getSatisfiedTypes().isEmpty()) {
+            if (paramType.getSatisfiedTypes()
+                         .isEmpty()) {
                 Type et = 
                         paramType.getExtendedType();
                 return et==null ? null : 
@@ -1079,10 +1079,7 @@ public class ModelUtil {
         boolean containsFunctionOrValueInterface
                 = containsFunctionOrValueInterface(receivingType);
         while (true) {
-            if (declaration instanceof Generic) {
-                Generic g = (Generic) declaration;
-                count += g.getTypeParameters().size();
-            }
+            count += declaration.getTypeParameters().size();
             if (declaration.isClassOrInterfaceMember()) {
                 declaration = 
                         (Declaration) 
@@ -1165,7 +1162,7 @@ public class ModelUtil {
             Declaration declaration,
             int count) {
         List<TypeParameter> typeParameters = 
-                getTypeParameters(declaration);
+                declaration.getTypeParameters();
         Map<TypeParameter,Type> map = 
                 new HashMap<TypeParameter,Type>
                     (count);
@@ -1265,7 +1262,7 @@ public class ModelUtil {
             }
         }
         List<TypeParameter> typeParameters = 
-                getTypeParameters(declaration);
+                declaration.getTypeParameters();
         for (int i=0; 
                 i<typeParameters.size() && 
                 i<variances.size(); 
@@ -1330,17 +1327,6 @@ public class ModelUtil {
         return count;
     }*/
 
-    public static List<TypeParameter> getTypeParameters(
-            Declaration declaration) {
-        if (declaration instanceof Generic) {
-            Generic g = (Generic) declaration;
-            return g.getTypeParameters();
-        }
-        else {
-            return emptyList();
-        }
-    }
-    
     static <T> List<T> list(List<T> list, T element) {
         List<T> result = new ArrayList<T>(list.size()+1);
         result.addAll(list);
@@ -1356,9 +1342,17 @@ public class ModelUtil {
      */
     public static void addToUnion(List<Type> list, 
             Type pt) {
+        if (list.size()==1 && 
+                list.get(0).isNothing()) {
+            list.clear();
+        }
+        if (!list.isEmpty() && 
+                list.get(0).isAnything()) {
+            return;
+        }
         if (pt==null || 
                 !list.isEmpty() && 
-                pt.isExactlyNothing()) {
+                pt.isNothing()) {
             return;
         }
         else if (pt.isAnything()) {
@@ -1401,12 +1395,20 @@ public class ModelUtil {
      */
     public static void addToIntersection(List<Type> list, 
             Type type, Unit unit) {
+        if (list.size()==1 && 
+                list.get(0).isAnything()) {
+            list.clear();
+        }
+        if (!list.isEmpty() && 
+                list.get(0).isNothing()) {
+            return;
+        }
         if (type==null || 
                 !list.isEmpty() && 
                 type.isAnything()) {
             return;
         }
-        else if (type.isExactlyNothing()) {
+        else if (type.isNothing()) {
             list.clear();
             list.add(type);
         }
@@ -1654,7 +1656,7 @@ public class ModelUtil {
             }
         }
         if (pd.isFinal()) {
-            if (pd.getTypeParameters().isEmpty() 
+            if (!pd.isParameterized() 
                     && !q.isUnknown()) {
                 Type qq = replaceTypeParameters(q, unit);
                 if (!qq.involvesTypeParameters() 
@@ -1668,7 +1670,7 @@ public class ModelUtil {
             }
         }
         if (qd.isFinal()) {
-            if (qd.getTypeParameters().isEmpty() 
+            if (!qd.isParameterized() 
                     && !p.isUnknown()) {
                 Type pp = replaceTypeParameters(p, unit);
                 if (!pp.involvesTypeParameters() 
@@ -1757,7 +1759,8 @@ public class ModelUtil {
         Map<TypeParameter,Type> resultArgs = null;
         for (Map.Entry<TypeParameter,Type> e: typeArgs.entrySet()) {
             Type arg = e.getValue();
-            if (arg.involvesTypeParameters()) {
+            if (arg!=null 
+                    && arg.involvesTypeParameters()) {
                 TypeParameter tp = e.getKey();
                 if (resultArgs==null) {
                     resultArgs = 
@@ -2015,8 +2018,8 @@ public class ModelUtil {
         String an = ad.getQualifiedNameString();
         String bn = bd.getQualifiedNameString();
         if (an.equals(bn)
-                && ad.getTypeParameters().isEmpty()
-                && bd.getTypeParameters().isEmpty())
+                && !ad.isParameterized()
+                && !bd.isParameterized())
             return a;
         if (a.isAnything()) {
             // everything is an Anything
@@ -2201,19 +2204,65 @@ public class ModelUtil {
             List<Declaration> members, String name,
             List<Type> signature, boolean variadic,
             boolean onlyExactMatches) {
+        return lookupMember(members, name, signature,
+                variadic, onlyExactMatches, null);
+    }
+    
+    /**
+     * Find the member which best matches the given signature
+     * among the given list of members. In the case that
+     * there are multiple matching declarations, attempt to
+     * return the "best" match, according to some ad-hoc 
+     * rules that roughly follow how Java resolves 
+     * overloaded methods.
+     * 
+     * @param members a list of members to search
+     * @param name the name of the member to find
+     * @param signature the parameter types to match, or
+     *        null if we're not matching on parameter types
+     * @param variadic true of we want to find a declaration
+     *        which supports varags, or false otherwise
+     * @param onlyExactMatches only consider exact matches
+     *        if a signature is provided. This means that if
+     *        true, members whose signature does not match
+     *        will not be returned. If the signature is null
+     *        this parameter has no effect as the signature
+     *        will not be checked.
+     * @param backends if non-null, will check that the member
+     *        is valid for the given backends.
+     *        
+     * @return the best matching declaration
+     */
+    public static Declaration lookupMember(
+            List<Declaration> members, String name,
+            List<Type> signature, boolean variadic,
+            boolean onlyExactMatches,
+            Backends backends) {
         List<Declaration> results = null;
         Declaration result = null;
         Declaration inexactMatch = null;
         for (int i=0, size=members.size(); i<size ; i++) {
             Declaration d = members.get(i);
-            if (isResolvable(d) && isNamed(name, d)) {
+            if (isResolvable(d) 
+                    && isNamed(name, d)
+                    && (backends == null || isForBackend(d, backends))){
                 if (signature==null) {
+                    //special case that is only needed
+                    //because sometimes the generated 
+                    //annotation constructor for a nested 
+                    //Java annotation collides with another 
+                    //Java member
+                    if (d instanceof Function 
+                            && d.isAnnotation()
+                            && d.isJava()) {
+                        result = d;
+                    }
                     //no argument types: either a type 
                     //declaration, an attribute, or a method 
                     //reference - don't return overloaded
                     //forms of the declaration (instead
                     //return the "abstraction" of them)
-                    if (notOverloaded(d)) {
+                    else if (notOverloaded(d)) {
                         return d;
                     }
                 }
@@ -2279,7 +2328,6 @@ public class ModelUtil {
     private static void addIfBetterMatch(
             List<Declaration> results, Declaration d, 
             List<Type> signature, boolean variadic) {
-        boolean add = true;
         for (Iterator<Declaration> i = results.iterator(); 
                 i.hasNext();) {
             Declaration o = i.next();
@@ -2287,10 +2335,17 @@ public class ModelUtil {
                 i.remove();
             }
             else if (isBetterMatch(o, d, signature, variadic)) { //TODO: note asymmetry here resulting in nondeterminate behavior!
-                add = false;
+                return;
+            }
+            //prefer a non-coerced member over a coerced one
+            else if (!d.isCoercionPoint() && o.isCoercionPoint()) {
+                i.remove();
+            }
+            else if (!o.isCoercionPoint() && d.isCoercionPoint()) {
+                return;
             }
         }
-        if (add) results.add(d);
+        results.add(d);
     }
     
     public static Declaration findMatchingOverloadedClass(
@@ -2314,10 +2369,11 @@ public class ModelUtil {
         }
         return abstractionClass;
     }
-
+    
     public static boolean isTypeUnknown(Type type) {
-        return type==null || type.getDeclaration()==null ||
-                type.containsUnknowns();
+        return type==null 
+            || type.getDeclaration()==null 
+            || type.containsUnknowns();
     }
     
     public static boolean isVariadic(
@@ -2867,15 +2923,19 @@ public class ModelUtil {
         return backends.none() || supported.supports(backends);
     }
     
-    // We use this to check for similar situations as "dynamic"
-    // where in this case the backend compiler can't check the
-    // validity of the code for the other backend 
-    public static boolean isNativeForWrongBackend(Backends backends, Backends supportedbackends) {
-        return !backends.none() &&
-                !backends.header() &&
-                !isForBackend(backends, supportedbackends);
+    public static boolean isNativeForWrongBackend(Scoped scoped) {
+        return isNativeForWrongBackend(scoped, scoped.getUnit());
     }
     
+    public static boolean isNativeForWrongBackend(Scoped scoped, Unit unit) {
+        // We use this to check for similar situations as "dynamic"
+        // where in this case the backend compiler can't check the
+        // validity of the code for the other backend 
+        Backends backends = scoped.getScopedBackends();
+        return !backends.none() 
+            && !backends.header() 
+            && !isForBackend(backends, unit.getSupportedBackends());
+    }
     /**
      * The list of type parameters of the given generic
      * declaration as types. (As viewed within the body of
@@ -2886,20 +2946,22 @@ public class ModelUtil {
      * 
      * @see Declaration#getTypeParametersAsArguments
      */
-    public static List<Type> typeParametersAsArgList(Generic dec) {
-        List<TypeParameter> params = 
-                dec.getTypeParameters();
-        if (params.isEmpty()) {
+    public static List<Type> typeParametersAsArgList(Declaration dec) {
+        if (dec.isParameterized()) {
+            List<TypeParameter> params = 
+                    dec.getTypeParameters();
+            int size = params.size();
+            List<Type> paramsAsArgs = 
+                    new ArrayList<Type>(size);
+            for (int i=0; i<size; i++) {
+                TypeParameter param = params.get(i);
+                paramsAsArgs.add(param.getType());
+            }
+            return paramsAsArgs;
+        }
+        else {
             return NO_TYPE_ARGS;
         }
-        int size = params.size();
-        List<Type> paramsAsArgs = 
-                new ArrayList<Type>(size);
-        for (int i=0; i<size; i++) {
-            TypeParameter param = params.get(i);
-            paramsAsArgs.add(param.getType());
-        }
-        return paramsAsArgs;
     }
     
     /**
@@ -3182,68 +3244,58 @@ public class ModelUtil {
     }
 
     public static void setVisibleScope(Declaration model) {
-        Scope s = model.getContainer();
-        while (s!=null) {
-            if (s instanceof Declaration) {
-                Declaration d = (Declaration) s;
+        Scope scope = model.getContainer();
+        while (scope!=null) {
+            if (scope instanceof Declaration) {
+                Declaration d = (Declaration) scope;
                 if (model.isShared()) {
                     if (!d.isShared()) {
-                        model.setVisibleScope(s.getContainer());
+                        model.setVisibleScope(scope.getContainer());
                         break;
                     }
                 }
                 else {
-                    model.setVisibleScope(s);
+                    model.setVisibleScope(scope);
                     break;
                 }
             }
-            else if (s instanceof Package) {
-                //TODO: unshared packages!
-                /*if (!((Package) s).isShared()) {
-                    model.setVisibleScope(s);
-                }*/
-                if (!model.isShared()) {
-                    model.setVisibleScope(s);
+            else if (scope instanceof Package) {
+                if (!model.isShared() 
+                        || model.isPackageVisibility()) {
+                    model.setVisibleScope(scope);
                 }
+                //TODO: unshared packages!
+                /*if (!((Package) scope).isShared()) {
+                    model.setVisibleScope(scope.getModule());
+                }*/
                 //null visible scope means visible everywhere
                 break;
             }
             else {
-                model.setVisibleScope(s);
+                //a control statement block or whatever
+                model.setVisibleScope(scope);
                 break;
             }    
-            s = s.getContainer();
+            scope = scope.getContainer();
         }
-    }
-
-    /**
-     * Determines whether the declaration's containing scope is a class or interface
-     * @param decl The declaration
-     * @return true if the declaration is within a class or interface
-     */
-    public static boolean withinClassOrInterface(Declaration decl) {
-        return decl.getContainer() instanceof ClassOrInterface;
-    }
-
-    public static boolean withinClass(Declaration decl) {
-        return decl.getContainer() instanceof Class;
     }
 
     public static boolean isLocalToInitializer(Declaration decl) {
         if (decl instanceof Setter) {
-            decl = ((Setter)decl).getGetter();
+            decl = ((Setter) decl).getGetter();
         }
-        return withinClass(decl) && !isCaptured(decl);
+        return decl.isClassMember() && !isCaptured(decl);
     }
 
     public static boolean isCaptured(Declaration decl) {
-        // Shared elements are implicitely captured although the typechecker doesn't mark them that way
+        // Shared elements are implicitly captured although 
+        // the typechecker doesn't mark them that way
         return decl.isCaptured() || decl.isShared();
     }
 
     public static boolean isNonTransientValue(Declaration decl) {
         if (decl instanceof Value) {
-            Value value = (Value)decl;
+            Value value = (Value) decl;
             return !value.isTransient();
         }
         else {
@@ -3256,10 +3308,10 @@ public class ModelUtil {
      */
     public static boolean isLocalNotInitializerScope(Scope scope) {
         return scope instanceof FunctionOrValue 
-                || scope instanceof Constructor
-                || scope instanceof ControlBlock
-                || scope instanceof NamedArgumentList
-                || scope instanceof Specification;
+            || scope instanceof Constructor
+            || scope instanceof ControlBlock
+            || scope instanceof NamedArgumentList
+            || scope instanceof Specification;
     }
 
     /**
@@ -3330,17 +3382,24 @@ public class ModelUtil {
     }
 
     public static boolean isBooleanTrue(Declaration d) {
-        return d!=null && d.getQualifiedNameString()
-                .equals("ceylon.language::true");
+        return isInLanguagePackage(d)
+            && "true".equals(d.getName());
     }
 
     public static boolean isBooleanFalse(Declaration d) {
-        return d!=null && d.getQualifiedNameString()
-                .equals("ceylon.language::false");
+        return isInLanguagePackage(d)
+            && "false".equals(d.getName());
+    }
+
+    private static boolean isInLanguagePackage(Declaration d) {
+        return d!=null 
+            && d.getUnit()
+                .getPackage()
+                .isLanguagePackage();
     }
 
     public static Type genericFunctionType(
-            Generic generic, Scope scope, 
+            Declaration generic, Scope scope, 
             Declaration member, Reference reference, 
             Unit unit) {
         List<TypeParameter> typeParameters = 
@@ -3424,8 +3483,9 @@ public class ModelUtil {
     /** Is the given value the result of an enumerated ("singleton") constructor */
     public static boolean isEnumeratedConstructor(Value value) {
         return value != null
-                && value.getType() != null
-                && value.getType().getDeclaration() instanceof Constructor;
+            && value.getType() != null
+            && value.getType().isConstructor()
+            && !value.getTypeDeclaration().isJavaEnum();
     }
 
     /** 
@@ -3480,6 +3540,35 @@ public class ModelUtil {
             }
         }
         return false;
+    }
+    
+    public static TypeDeclaration erasedType(Parameter p, Unit unit) {
+        return p==null ? null : 
+            p.isSequenced() ? 
+                unit.getSequentialDeclaration() : 
+                erasedType(p.getType(), unit);
+    }
+    
+    private static TypeDeclaration erasedType(Type x, Unit unit) {
+        // this doesn't distinguish Integer (long) 
+        // from Integer? (Integer) which is actually 
+        // a legal overload
+        if (x==null || x.isUnknown()) {
+            return unit.getObjectDeclaration();
+        }
+        x = x.resolveAliases();
+        if (x.isNothing() || x.isAnything()
+                || x.isNull()) {
+            return unit.getObjectDeclaration();
+        }
+        x = unit.getDefiniteType(x);
+        if (x.isUnion() || x.isIntersection()
+                || x.isObject()
+                || x.isBasic()
+                || x.isIdentifiable()) {
+            return unit.getObjectDeclaration();
+        }
+        return x.getDeclaration();
     }
     
 }

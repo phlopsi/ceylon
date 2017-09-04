@@ -15,6 +15,7 @@
     IMPORT_PATH? groupImportPath
     QUOTED_LITERAL? groupQuotedLiteral
     QUOTED_LITERAL? artifact
+    QUOTED_LITERAL? classifier
     QUOTED_LITERAL? version
     IMPORT_MODULE_LIST)
 
@@ -25,6 +26,7 @@
 
 "A list of modules imported by a module."
 ^(IMPORT_MODULE_LIST
+    ANY_ATTRIBUTE* constant
     IMPORT_MODULE*)
 
 "A module import."
@@ -34,7 +36,9 @@
     IMPORT_PATH?
     QUOTED_LITERAL?
     QUOTED_LITERAL? artifact
+    QUOTED_LITERAL? classifier
     QUOTED_LITERAL? version
+    BASE_MEMBER_EXPRESSION? constantVersion
     string name;)
 
 "A list of packages imported by a compilation unit."
@@ -105,7 +109,7 @@
     STATIC_TYPE type)
 ^(CASE_TYPES 
     STATIC_TYPE* type
-    BASE_MEMBER_EXPRESSION*)
+    STATIC_MEMBER_OR_TYPE_EXPRESSION* baseMemberExpression)
 ^(EXTENDED_TYPE 
     SIMPLE_TYPE? type
     INVOCATION_EXPRESSION?)
@@ -273,7 +277,8 @@
 
 "A method or attribute body containing statements and declarations."
 ^(BLOCK:BODY
-    boolean definitelyReturns;)
+    boolean definitelyReturns;
+    boolean definitelyBreaksOrContinues;)
 
 "A class body."
 ^(CLASS_BODY:BODY)
@@ -365,7 +370,8 @@
 ^(FUNCTION_LITERAL:MEMBER_LITERAL)
 
 ^(MODULE_LITERAL:META_LITERAL
-    IMPORT_PATH?)
+    IMPORT_PATH?
+    boolean restriction;)
 
 ^(PACKAGE_LITERAL:META_LITERAL
     IMPORT_PATH?)
@@ -453,8 +459,10 @@
     PATTERN key
     PATTERN value)
 
+^(LET_STATEMENT:EXECUTABLE_STATEMENT
+    STATEMENT* variable)
+    
 ^(DESTRUCTURE:EXECUTABLE_STATEMENT
-    VALUE_MODIFIER? type
     PATTERN
     SPECIFIER_EXPRESSION
     boolean patternCase;)
@@ -501,11 +509,13 @@
 ^(CASE_CLAUSE:CONTROL_CLAUSE
     CASE_ITEM
     BLOCK?
-    EXPRESSION?)
+    EXPRESSION?
+    boolean overlapping;)
     
 ^(CASE_ITEM)
 ^(MATCH_CASE:CASE_ITEM
-    EXPRESSION_LIST)
+    MATCH_LIST expressionList
+    VARIABLE?)
 ^(IS_CASE:CASE_ITEM
     TYPE
     VARIABLE?)
@@ -686,6 +696,10 @@
 "A parenthesized list of expressions."
 ^(EXPRESSION_LIST 
     EXPRESSION*)
+
+^(MATCH_LIST:EXPRESSION_LIST
+    TYPE*)
+   
 
 "An expression."
 ^(EXPRESSION:ATOM 

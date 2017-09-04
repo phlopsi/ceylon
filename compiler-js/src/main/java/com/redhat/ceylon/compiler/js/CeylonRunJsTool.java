@@ -20,6 +20,7 @@ import com.redhat.ceylon.cmr.api.ArtifactContext;
 import com.redhat.ceylon.cmr.api.CmrRepository;
 import com.redhat.ceylon.cmr.api.ModuleQuery;
 import com.redhat.ceylon.cmr.api.RepositoryManager;
+import com.redhat.ceylon.cmr.api.ModuleQuery.Type;
 import com.redhat.ceylon.cmr.impl.AssemblyRepositoryBuilder;
 import com.redhat.ceylon.cmr.util.JarUtils;
 import com.redhat.ceylon.common.Constants;
@@ -192,13 +193,19 @@ public class CeylonRunJsTool extends RepoUsingTool {
         output = value;
     }
 
+    @OptionArgument(argumentName="option")
+    @Description("Passes an option to the underlying ceylon compiler.")
+    public void setCompilerArguments(List<String> compilerArguments) {
+        this.compilerArguments = compilerArguments;
+    }
+    
     @OptionArgument(argumentName="debug")
     @Description("Shows more detailed output in case of errors.")
     public void setDebug(boolean debug) {
         this.debug = debug;
     }
 
-    @OptionArgument(longName = "run", argumentName = "toplevel")
+    @OptionArgument(shortName='x', longName = "run", argumentName = "toplevel")
     @Description("Specifies the fully qualified name of a toplevel method or class to run. " +
             "The indicated declaration must be shared by the `module` and have no parameters. " +
             "The format is: `qualified.package.name::classOrMethodName` with `::` acting as separator " +
@@ -207,10 +214,11 @@ public class CeylonRunJsTool extends RepoUsingTool {
         this.func = func;
     }
 
-    @Option
+    @Option(shortName='c')
     @OptionArgument(argumentName = "flags")
     @Description("Determines if and how compilation should be handled. " +
-            "Allowed flags include: `never`, `once`, `force`, `check`.")
+            "Allowed flags include: `never`, `once`, `force`, `check`. " +
+            "If no flags are specified, defaults to `check`.")
     public void setCompile(String compile) {
         this.compileFlags = compile;
     }
@@ -220,8 +228,8 @@ public class CeylonRunJsTool extends RepoUsingTool {
         this.module= moduleVersion;
     }
 
-    @OptionArgument
-    @Description("Specifies the path to a Ceylon Assembly file that should be executed")
+    @OptionArgument(shortName='a', argumentName="archive")
+    @Description("Specifies the path to a Ceylon archive that should be executed")
     public void setAssembly(File assembly) {
         this.assembly = assembly;
     }
@@ -235,6 +243,11 @@ public class CeylonRunJsTool extends RepoUsingTool {
     @Description("The path to the Node.js executable. Will be searched in standard locations if not specified.")
     public void setNodeExe(String path) {
         this.exepath=path;
+    }
+
+    @Override
+    protected Type getCompilerType() {
+        return ModuleQuery.Type.JS;
     }
 
     private static String getNodePath() {

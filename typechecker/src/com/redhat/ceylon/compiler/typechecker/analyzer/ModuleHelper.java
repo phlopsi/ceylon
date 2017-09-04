@@ -29,20 +29,23 @@ public class ModuleHelper {
         error.append("artifact ");
         error.append("'").append( artifactContext.toString() ).append("'");
         if ( exceptionOnGetArtifact != null ) {
-            error.append( "\ndue to connection error: " + exceptionOnGetArtifact.getMessage() );
+            String message = exceptionOnGetArtifact.getMessage();
+            if (message==null) {
+                message = exceptionOnGetArtifact.getClass().getName();
+            }
+            error.append( "\ndue to connection error: " + message );
         }
-        //FIXME add list of repositories when ceylon/ceylon-module-resolver/issues/26 is fixed
-//                    error.append("\n\t  in repositories : ");
-//                    if (artifactProviders.size() > 0) {
-//                        error.append(artifactProviders.get(0));
-//                    }
-//                    if (artifactProviders.size() > 1) {
-//                        for (ArtifactProvider searchedProvider : artifactProviders.subList(1, artifactProviders.size())) {
-//                            error.append(", ");
-//                            error.append("\n\t");
-//                            error.append(searchedProvider);
-//                        }
-//                    }
+        
+        /*List<String> repos = 
+                moduleManagerUtil.getContext()
+                    .getRepositoryManager()
+                    .getRepositoriesDisplayString();
+        error.append("\n\t- in repositories:");
+        for (String repo: repos) {
+            error.append("\n\t  ");
+            error.append(repo);
+        }*/
+        
         error.append("\n\t- dependency tree: ");
         buildDependencyString(dependencyTree, module, error);
         if ( moduleManagerUtil.getContext().getModules().getLanguageModule() == module) {

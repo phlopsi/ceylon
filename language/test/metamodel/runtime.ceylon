@@ -1,4 +1,5 @@
 import check {
+    check,
     initAssert,
     results,
     resultsAndAssert,
@@ -168,12 +169,12 @@ shared void checkInitializers(){
     variadicClass.apply(2, "a", "a");
     unflatten(variadicClass)([2, "a", "a"]);
     
-    try{
-        `Modifiers`();
-        assert(false);
-    }catch(Exception x){
-        assert(is InvocationException x);
-    }
+    //try{
+    //    `Modifiers`();
+    //    assert(false);
+    //}catch(Exception x){
+    //    assert(is InvocationException x);
+    //}
     try{
         `Modifiers`.apply();
         assert(false);
@@ -2285,6 +2286,7 @@ void runTests() {
     sandbox(bug5893);
     sandbox(bug5966);
     sandbox(bug6364);
+    sandbox(bug7174);
     // those were filed for the JVM compiler initially
     sandbox(bugC1196test);
     sandbox(bugC1197);
@@ -2310,6 +2312,7 @@ void runTests() {
     // ATTENTION!
     // When you add new test methods here make sure they are "shared" and marked "@test"!
     print(pass==total then "Metamodel tests OK (``total`` total)" else "Metamodel tests ``pass``/``total``");
+    check(pass==total, "Individual metamodel test pass/total counts: ``pass`` != ``total``");
 }
 
 shared void run() {

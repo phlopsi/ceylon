@@ -146,6 +146,10 @@ public class Overrides {
         return this.source == null ? super.toString() : "Overrides("+source+")";
     }
     
+    public String getSource() {
+        return source;
+    }
+    
     public void addArtifactOverride(ArtifactOverrides ao) {
         overrides.put(ao.getOwner(), ao);
         if(ao.getOwner().getVersion() == null)
@@ -211,6 +215,7 @@ public class Overrides {
             ret.setVersion(context.getVersion());
         // even if we replace, respect the set version
         ret.setVersion(getVersionOverride(ret));
+        ret.setNamespace(replacingContext.getNamespace());
         return ret;
     }
 
@@ -281,18 +286,19 @@ public class Overrides {
             if(artifactOverrides.getFilter() != null)
                 filter = artifactOverrides.getFilter();
             for(DependencyOverride add : artifactOverrides.getAdd()){
-                result.add(new ModuleDependencyInfo(add.getArtifactContext().getNamespace(), 
-                        add.getArtifactContext().getName(), add.getArtifactContext().getVersion(),
+                ArtifactContext addContext = add.getArtifactContext();
+                result.add(new ModuleDependencyInfo(addContext.getNamespace(), 
+                        addContext.getName(), addContext.getVersion(),
                         add.isOptional(),
                         add.isShared()));
             }
         }
-        return new ModuleInfo(module, version, source.getGroupId(), source.getArtifactId(), filter, result);
+        return new ModuleInfo(source.getNamespace(), module, version, source.getGroupId(), source.getArtifactId(), source.getClassifier(), filter, result);
     }
 
     private static Overrides parse(String overridesFileName, Overrides overrides) throws OverrideException{
         File overridesFile = new File(overridesFileName);
-        if (overridesFile.exists() == false) {
+        if (!overridesFile.exists()) {
             throw new OverrideNotFoundException("No such overrides file: " + overridesFile);
         }
         try(InputStream is = new FileInputStream(overridesFile)){
@@ -420,6 +426,11 @@ public class Overrides {
                 Node node = filterNode.get(0);
                 ao.setFilter(interpolate(PathFilterParser.convertNodeToString(node), interpolation));
             }
+            List<Element> versionNode = getChildren(artifact, "version");
+            if (versionNode != null && !versionNode.isEmpty()) {
+                Node node = versionNode.get(0);
+                ao.setVersion(interpolate(node.getTextContent(), interpolation));
+            }
             List<Element> classifierNode = getChildren(artifact, "classifier");
             if (classifierNode != null && !classifierNode.isEmpty()) {
                 Node node = classifierNode.get(0);
@@ -528,7 +539,7 @@ public class Overrides {
             String version = optionalVersion ? getAttribute(element, "version", interpolation) : getRequiredAttribute(element, "version", interpolation);
             String packaging = getAttribute(element, "packaging", interpolation);
             String classifier = getAttribute(element, "classifier", interpolation);
-            return createMavenArtifactContext(groupId, artifactId, version, packaging, classifier);
+            return new MavenArtifactContext(groupId, artifactId, classifier, version, packaging);
         }else{
             String moduleUri = getRequiredAttribute(element, "module", interpolation);
             String namespace = ModuleUtil.getNamespaceFromUri(moduleUri);
@@ -541,6 +552,15 @@ public class Overrides {
     protected static void addOverrides(ArtifactOverrides ao, Element artifact, DependencyOverride.Type type, Map<String, String> interpolation) {
         List<Element> overrides = getChildren(artifact, type.name().toLowerCase());
         for (Element override : overrides) {
+            NodeList overrideChildren = override.getChildNodes();
+            for(int i=0;i<overrideChildren.getLength();i++){
+                Node item = overrideChildren.item(i);
+                if(item.getNodeType() == Node.ELEMENT_NODE){
+                    throw new InvalidOverrideException(String.format("Element '%s > %s' accepts no child element (seen '%s').", 
+                            artifact.getTagName(), override.getTagName(), item.getNodeName()), 
+                            (Element)item);
+                }
+            }
             ArtifactContext dep = getArtifactContext(override, type == Type.REMOVE, interpolation);
             boolean shared = getBooleanAttribute(override, "shared", interpolation);
             boolean optional = getBooleanAttribute(override, "optional", interpolation);
@@ -651,11 +671,6 @@ public class Overrides {
         return ret;
     }
 
-    public static ArtifactContext createMavenArtifactContext(String groupId, String artifactId, String version, 
-                                                             String packaging, String classifier) {
-        return new MavenArtifactContext(groupId, artifactId, version, packaging, classifier);
-    }
-    
     public ArtifactContext applyOverrides(final ArtifactContext sought) {
         ArtifactContext replacedContext = this.replace(sought);
         if(replacedContext == null) {

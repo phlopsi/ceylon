@@ -58,6 +58,7 @@ import com.redhat.ceylon.model.cmr.RuntimeResolver;
 import ceylon.modules.api.runtime.LogChecker;
 import ceylon.modules.api.util.ModuleVersion;
 import ceylon.modules.jboss.repository.ResourceLoaderProvider;
+import ceylon.modules.jboss.runtime.Graph.Vertex;
 
 /**
  * Ceylon JBoss Module loader.
@@ -78,31 +79,11 @@ public class CeylonModuleLoader extends ModuleLoader
     private static final ModuleIdentifier MODULES;
     private static final ModuleIdentifier LOGMANAGER;
     private static final ModuleIdentifier RUNTIME;
-    private static final ModuleIdentifier ANTLR_ANTLR;
-    private static final ModuleIdentifier ANTLR_STRINGTEMPLATE;
     private static final ModuleIdentifier ANTLR_RUNTIME;
     private static final ModuleIdentifier CLI;
     private static final ModuleIdentifier MARKDOWN_PAPERS;
     // Maven support
-    private static final ModuleIdentifier AETHER_API;
-    private static final ModuleIdentifier AETHER_SPI;
-    private static final ModuleIdentifier AETHER_UTIL;
-    private static final ModuleIdentifier AETHER_IMPL;
-    private static final ModuleIdentifier AETHER_CONNECTOR_BASIC;
-    private static final ModuleIdentifier AETHER_TRANSPORT_FILE;
-    private static final ModuleIdentifier AETHER_TRANSPORT_HTTP;
-    private static final ModuleIdentifier GUAVA;
-    private static final ModuleIdentifier COMMONS_LANG3;
-    private static final ModuleIdentifier MAVEN_ARTIFACT;
-    private static final ModuleIdentifier MAVEN_MODEL;
-    private static final ModuleIdentifier MAVEN_MODEL_BUILDER;
-    private static final ModuleIdentifier MAVEN_REPOSITORY_METADATA;
-    private static final ModuleIdentifier MAVEN_BUILDER_SUPPORT;
-    private static final ModuleIdentifier MAVEN_SETTINGS;
-    private static final ModuleIdentifier MAVEN_SETTINGS_BUILDER;
-    private static final ModuleIdentifier MAVEN_AETHER_PROVIDER;
-    private static final ModuleIdentifier PLEXUS_INTERPOLATION;
-    private static final ModuleIdentifier PLEXUS_UTILS;
+    private static final ModuleIdentifier AETHER;
 
     private static final String CEYLON_RUNTIME_PATH;
     private static final Set<ModuleIdentifier> BOOTSTRAP;
@@ -126,33 +107,13 @@ public class CeylonModuleLoader extends ModuleLoader
         CLI = ModuleIdentifier.create("com.redhat.ceylon.cli", defaultVersion);
 
         // Maven support
-        AETHER_API = ModuleIdentifier.create("org.eclipse.aether.api", "1.1.0");
-        AETHER_SPI = ModuleIdentifier.create("org.eclipse.aether.spi", "1.1.0");
-        AETHER_UTIL = ModuleIdentifier.create("org.eclipse.aether.util", "1.1.0");
-        AETHER_IMPL = ModuleIdentifier.create("org.eclipse.aether.impl", "1.1.0");
-        AETHER_CONNECTOR_BASIC = ModuleIdentifier.create("org.eclipse.aether.connector.basic", "1.1.0");
-        AETHER_TRANSPORT_FILE = ModuleIdentifier.create("org.eclipse.aether.transport.file", "1.1.0");
-        AETHER_TRANSPORT_HTTP = ModuleIdentifier.create("org.eclipse.aether.transport.http", "1.1.0");
-        GUAVA = ModuleIdentifier.create("com.google.guava", "18.0");
-        COMMONS_LANG3 = ModuleIdentifier.create("org.apache.commons.lang3", "3.4");
-        MAVEN_ARTIFACT = ModuleIdentifier.create("org.apache.maven.maven-artifact", "3.3.9");
-        MAVEN_MODEL = ModuleIdentifier.create("org.apache.maven.maven-model", "3.3.9");
-        MAVEN_MODEL_BUILDER = ModuleIdentifier.create("org.apache.maven.maven-model-builder", "3.3.9");
-        MAVEN_REPOSITORY_METADATA = ModuleIdentifier.create("org.apache.maven.maven-repository-metadata", "3.3.9");
-        MAVEN_BUILDER_SUPPORT = ModuleIdentifier.create("org.apache.maven.maven-builder-support", "3.3.9");
-        MAVEN_SETTINGS = ModuleIdentifier.create("org.apache.maven.maven-settings", "3.3.9");
-        MAVEN_SETTINGS_BUILDER = ModuleIdentifier.create("org.apache.maven.maven-settings-builder", "3.3.9");
-        MAVEN_AETHER_PROVIDER = ModuleIdentifier.create("org.apache.maven.maven-aether-provider", "3.3.9");
-        PLEXUS_INTERPOLATION = ModuleIdentifier.create("org.codehaus.plexus.plexus-interpolation", "1.22");
-        PLEXUS_UTILS = ModuleIdentifier.create("org.codehaus.plexus.plexus-utils", "3.0.22");
+        AETHER = ModuleIdentifier.create("com.redhat.ceylon.aether", "3.3.9");
         
         MODULES = ModuleIdentifier.create("org.jboss.modules", Versions.DEPENDENCY_JBOSS_MODULES_VERSION);
         LOGMANAGER = ModuleIdentifier.create("org.jboss.logmanager", Versions.DEPENDENCY_LOGMANAGER_VERSION);
         RUNTIME = ModuleIdentifier.create("ceylon.runtime", defaultVersion);
-        ANTLR_ANTLR = ModuleIdentifier.create("org.antlr.antlr", "2.7.7");
-        ANTLR_STRINGTEMPLATE = ModuleIdentifier.create("org.antlr.stringtemplate", "3.2.1");
-        ANTLR_RUNTIME = ModuleIdentifier.create("org.antlr.runtime", "3.4");
-        MARKDOWN_PAPERS = ModuleIdentifier.create("org.tautua.markdownpapers.core", "1.2.7");
+        ANTLR_RUNTIME = ModuleIdentifier.create("org.antlr.runtime", "3.5.2");
+        MARKDOWN_PAPERS = ModuleIdentifier.create("org.tautua.markdownpapers.core", "1.3.4");
 
         CEYLON_RUNTIME_PATH = ModuleVersion.class.getPackage().getName().replace(".", "/");
 
@@ -170,31 +131,11 @@ public class CeylonModuleLoader extends ModuleLoader
         BOOTSTRAP.add(LOGMANAGER);
         BOOTSTRAP.add(RUNTIME);
         BOOTSTRAP.add(ANTLR_RUNTIME);
-        BOOTSTRAP.add(ANTLR_ANTLR);
-        BOOTSTRAP.add(ANTLR_STRINGTEMPLATE);
         
         BOOTSTRAP_OPTIONAL = new HashSet<>();
         BOOTSTRAP_OPTIONAL.add(MARKDOWN_PAPERS);
         // Maven support
-        BOOTSTRAP_OPTIONAL.add(AETHER_API);
-        BOOTSTRAP_OPTIONAL.add(AETHER_SPI);
-        BOOTSTRAP_OPTIONAL.add(AETHER_UTIL);
-        BOOTSTRAP_OPTIONAL.add(AETHER_IMPL);
-        BOOTSTRAP_OPTIONAL.add(AETHER_CONNECTOR_BASIC);
-        BOOTSTRAP_OPTIONAL.add(AETHER_TRANSPORT_FILE);
-        BOOTSTRAP_OPTIONAL.add(AETHER_TRANSPORT_HTTP);
-        BOOTSTRAP_OPTIONAL.add(GUAVA);
-        BOOTSTRAP_OPTIONAL.add(COMMONS_LANG3);
-        BOOTSTRAP_OPTIONAL.add(MAVEN_ARTIFACT);
-        BOOTSTRAP_OPTIONAL.add(MAVEN_MODEL);
-        BOOTSTRAP_OPTIONAL.add(MAVEN_MODEL_BUILDER);
-        BOOTSTRAP_OPTIONAL.add(MAVEN_REPOSITORY_METADATA);
-        BOOTSTRAP_OPTIONAL.add(MAVEN_BUILDER_SUPPORT);
-        BOOTSTRAP_OPTIONAL.add(MAVEN_SETTINGS);
-        BOOTSTRAP_OPTIONAL.add(MAVEN_SETTINGS_BUILDER);
-        BOOTSTRAP_OPTIONAL.add(MAVEN_AETHER_PROVIDER);
-        BOOTSTRAP_OPTIONAL.add(PLEXUS_INTERPOLATION);
-        BOOTSTRAP_OPTIONAL.add(PLEXUS_UTILS);
+        BOOTSTRAP_OPTIONAL.add(AETHER);
         
 
         Set<String> jdkPaths = new HashSet<>();
@@ -287,12 +228,11 @@ public class CeylonModuleLoader extends ModuleLoader
      * @param visited already visited modules
      * @throws ModuleLoadException for any modules error
      */
-    @SuppressWarnings({"unchecked"})
     private void relink(ModuleIdentifier mi, Set<ModuleIdentifier> visited) throws ModuleLoadException {
         if (visited.add(mi) == false)
             return;
 
-        Graph.Vertex v = graph.getVertex(mi);
+        Vertex<ModuleIdentifier, Boolean> v = graph.getVertex(mi);
         if (v == null)
             return;
 

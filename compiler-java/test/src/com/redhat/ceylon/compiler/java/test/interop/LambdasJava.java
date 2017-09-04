@@ -2,6 +2,8 @@ package com.redhat.ceylon.compiler.java.test.interop;
 
 import java.lang.annotation.Annotation;
 import java.util.function.*;
+// NOTE: DO NOT REMOVE, apparently we generate a Class type in this damn package
+import java.lang.Class;
 
 @FunctionalInterface
 interface VariadicFunction {
@@ -97,7 +99,7 @@ public class LambdasJava {
 
     public Class<?> getKlass(){ return null; }
     public void setKlass(Class<?> k){}
-    
+
     public void charSequences(CharSequence... cs){
     }
 
@@ -114,6 +116,31 @@ public class LambdasJava {
     public void takeIterableString(Iterable<String> it){}
 
     public void takeAnnotation(Annotation at){}
+    
+    public <T> void arrays(long[] l, double[] d, byte[] b, boolean[] bb, LambdasJava[] lj, T[] t){
+        assert(l.length == 2);
+        assert(l[0] == 1);
+        assert(l[1] == 2);
+
+        assert(d.length == 2);
+        assert(d[0] == 1.0);
+        assert(d[1] == 2.0);
+
+        assert(b.length == 2);
+        assert(b[0] == 1);
+        assert(b[1] == 2);
+
+        assert(bb.length == 2);
+        assert(bb[0] == true);
+        assert(bb[1] == false);
+
+        assert(lj.length == 2);
+        assert(lj[0] == this);
+        assert(lj[1] == null);
+
+        assert(t.length == 1);
+        assert(t[0] == this);
+    }
 }
 
 interface InterfaceWithCoercedMembers {

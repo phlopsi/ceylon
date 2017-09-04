@@ -97,7 +97,7 @@ public final class Array<Element>
     private final ArrayType elementType;
 
     
-    @Ignore
+    @Ignore(handWritten = true)
     public Array(final TypeDescriptor $reifiedElement, 
             int size, Element element) {
         this($reifiedElement, 
@@ -293,150 +293,106 @@ public final class Array<Element>
             return array;
         }
         
+        Iterator<?> iterator = elements.iterator();
         switch (elementType($reifiedElement)) {
         case CeylonString:
             //note: we don't unbox strings in an Array<String?>
             //      because it would break javaObjectArray()
             java.lang.String[] stringArray = new java.lang.String[size];
             for (int i=0; i<size; i++) {
-                String e = (String) elements.getFromFirst(i);
-                checkElement(e);
-                stringArray[i] = e.value;
+                String string = (String) iterator.next();
+                stringArray[i] = string==null ? null : string.value;
             }
             return stringArray;
         case CeylonInteger:
             long[] longPrecisionArray = new long[size];
             for (int i=0; i<size; i++) {
-                Integer e = (Integer) elements.getFromFirst(i);
-                checkElement(e);
-                longPrecisionArray[i] = e.value;
+                longPrecisionArray[i] = ((Integer) iterator.next()).value;
             }
             return longPrecisionArray;
         case CeylonFloat:
             double[] doublePrecisionArray = new double[size];
             for (int i=0; i<size; i++) {
-                Float e = (Float) elements.getFromFirst(i);
-                checkElement(e);
-                doublePrecisionArray[i] = e.value;
+                doublePrecisionArray[i] = ((Float) iterator.next()).value;
             }
             return doublePrecisionArray;
         case CeylonCharacter:
             int[] codepointArray = new int[size];
             for (int i=0; i<size; i++) {
-                Character e = (Character) elements.getFromFirst(i);
-                checkElement(e);
-                codepointArray[i] = e.codePoint;
+                codepointArray[i] = ((Character) iterator.next()).codePoint;
             }
             return codepointArray;
         case CeylonBoolean:
             boolean[] boolArray = new boolean[size];
             for (int i=0; i<size; i++) {
-                Boolean e = (Boolean) elements.getFromFirst(i);
-                checkElement(e);
-                boolArray[i] = e.booleanValue();
+                boolArray[i] = ((Boolean) iterator.next()).booleanValue();
             }
             return boolArray;
         case CeylonByte:
             byte[] bitsArray = new byte[size];
             for (int i=0; i<size; i++) {
-                Byte e = (Byte) elements.getFromFirst(i);
-                checkElement(e);
-                bitsArray[i] = e.value;
+                bitsArray[i] = ((Byte) iterator.next()).value;
             }
             return bitsArray;
         case JavaBoolean:
             boolean[] booleanArray = new boolean[size];
             for (int i=0; i<size; i++) {
-                java.lang.Boolean e = (java.lang.Boolean)
-                        elements.getFromFirst(i);
-                checkElement(e);
-                booleanArray[i] = e;
+                booleanArray[i] = (java.lang.Boolean) iterator.next();
             }
             return booleanArray;
         case JavaCharacter:
             char[] charArray = new char[size];
             for (int i=0; i<size; i++) {
-                java.lang.Character e = (java.lang.Character)
-                        elements.getFromFirst(i);
-                checkElement(e);
-                charArray[i] = e;
+                charArray[i] = (java.lang.Character) iterator.next();
             }
             return charArray;
         case JavaFloat:
             float[] floatArray = new float[size];
             for (int i=0; i<size; i++) {
-                java.lang.Float e = (java.lang.Float)
-                        elements.getFromFirst(i);
-                checkElement(e);
-                floatArray[i] = e;
+                floatArray[i] = (java.lang.Float) iterator.next();
             }
             return floatArray;
         case JavaDouble:
             double[] doubleArray = new double[size];
             for (int i=0; i<size; i++) {
-                java.lang.Double e = (java.lang.Double)
-                        elements.getFromFirst(i);
-                checkElement(e);
-                doubleArray[i] = e;
+                doubleArray[i] = (java.lang.Double) iterator.next();
             }
             return doubleArray;
         case JavaByte:
             byte[] byteArray = new byte[size];
             for (int i=0; i<size; i++) {
-                java.lang.Byte e = (java.lang.Byte)
-                        elements.getFromFirst(i);
-                checkElement(e);
-                byteArray[i] = e;
+                byteArray[i] = (java.lang.Byte) iterator.next();
             }
             return byteArray;
         case JavaShort:
             short[] shortArray = new short[size];
             for (int i=0; i<size; i++) {
-                java.lang.Short e = (java.lang.Short)
-                        elements.getFromFirst(i);
-                checkElement(e);
-                shortArray[i] = e;
+                shortArray[i] = (java.lang.Short) iterator.next();
             }
             return shortArray;
         case JavaInteger:
             int[] intArray = new int[size];
             for (int i=0; i<size; i++) {
-                java.lang.Integer e = (java.lang.Integer)
-                        elements.getFromFirst(i);
-                checkElement(e);
-                intArray[i] = e;
+                intArray[i] = (java.lang.Integer) iterator.next();
             }
             return intArray;
         case JavaLong:
             long[] longArray = new long[size];
             for (int i=0; i<size; i++) {
-                java.lang.Long e = (java.lang.Long)
-                        elements.getFromFirst(i);
-                checkElement(e);
-                longArray[i] = e;
+                longArray[i] =(java.lang.Long) iterator.next();
             }
             return longArray;
         default:
             java.lang.Class<?> clazz = 
                     $reifiedElement.getArrayElementClass();
-            java.lang.Object[] objectArray = (java.lang.Object[]) 
+            java.lang.Object[] array = (java.lang.Object[]) 
                     java.lang.reflect.Array.newInstance(clazz, size);
-            boolean containsNull = $reifiedElement.containsNull();
             for (int i=0; i<size; i++) {
-                Element e = elements.getFromFirst(i);
-                if (!containsNull) {
-                    checkElement(e);
-                }
-                objectArray[i] = e;
+                array[i] = iterator.next();
             }
-            return objectArray;
+            return array;
         }
-    }
 
-    private static void checkElement(java.lang.Object e) {
-        if (e==null) {
-            throw new AssertionError("missing element");
-        }
     }
 
     private static <Element> java.lang.Object createArrayFromArray(
@@ -748,6 +704,14 @@ public final class Array<Element>
                 TypeDescriptor.union(Null.$TypeDescriptor$,
                         TypeDescriptor.klass(componentType));
         return new Array<T>(optionalType, array);
+    }
+    
+    @Ignore
+    public static Array<StackTraceElement> stackTrace(
+            StackTraceElement[] array) {
+        return new Array<StackTraceElement>(
+                TypeDescriptor.klass(StackTraceElement.class), 
+                array);
     }
     
     private static final TypeDescriptor CHAR_TYPE = 
@@ -1700,6 +1664,59 @@ public final class Array<Element>
         return array;
     }
 
+    @Ignore
+    public java.lang.Object[] toObjectArray() {
+        if (stringArray!=null) {
+            java.lang.Object[] arr = 
+                    new java.lang.Object[stringArray.length];
+            for (int i=0; i<stringArray.length; i++) {
+                arr[i] = String.instance(stringArray[i]);
+            }
+            return arr;
+        }
+        if (longArray!=null) {
+            java.lang.Object[] arr = 
+                    new java.lang.Object[longArray.length];
+            for (int i=0; i<longArray.length; i++) {
+                arr[i] = Integer.instance(longArray[i]);
+            }
+            return arr;
+        }
+        if (doubleArray!=null) {
+            java.lang.Object[] arr = 
+                    new java.lang.Object[doubleArray.length];
+            for (int i=0; i<doubleArray.length; i++) {
+                arr[i] = Float.instance(doubleArray[i]);
+            }
+            return arr;
+        }
+        if (intArray!=null) {
+            java.lang.Object[] arr = 
+                    new java.lang.Object[intArray.length];
+            for (int i=0; i<intArray.length; i++) {
+                arr[i] = Character.instance(intArray[i]);
+            }
+            return arr;
+        }
+        if (booleanArray!=null) {
+            java.lang.Object[] arr = 
+                    new java.lang.Object[booleanArray.length];
+            for (int i=0; i<booleanArray.length; i++) {
+                arr[i] = Boolean.instance(booleanArray[i]);
+            }
+            return arr;
+        }
+        if (byteArray!=null) {
+            java.lang.Object[] arr = 
+                    new java.lang.Object[byteArray.length];
+            for (int i=0; i<byteArray.length; i++) {
+                arr[i] = Byte.instance(byteArray[i]);
+            }
+            return arr;
+        }
+        return objectArray;
+    }
+
     @Override
     public boolean contains(@Name("element") 
     @TypeInfo("ceylon.language::Object")
@@ -1899,7 +1916,7 @@ public final class Array<Element>
     
     @SuppressWarnings("unchecked")
     @Override
-    @TypeInfo("ceylon.language::Sequential<Element>")
+    @TypeInfo("ceylon.language::Sequence<Element>|ceylon.language::Empty")
     public Sequential<? extends Element> 
     sort(@Name("comparing") @FunctionalParameter("(x,y)")
     @TypeInfo("ceylon.language::Comparison(Element,Element)") 
@@ -2536,45 +2553,80 @@ public final class Array<Element>
     @Override
     public boolean equals(
             @Name("that")
-            java.lang.Object that) {
-        if (that instanceof Array) {
-            java.lang.Object x = ((Array<?>) that).array;
-            java.lang.Object y = ((Array<?>) this).array;
-            if (x instanceof double[] && y instanceof double[]) {
-                return Arrays.equals((double[]) x, (double[]) y);
+            java.lang.Object object) {
+        if (object instanceof Array) {
+            Array<?> that = (Array<?>) object;
+            if (this.size!=that.size) {
+                return false;
             }
-            else if (x instanceof float[] && y instanceof float[]) {
-                return Arrays.equals((float[]) x, (float[]) y);
+            
+            java.lang.Object thisArray = this.array;
+            java.lang.Object thatArray = that.array;
+            if (thatArray==thisArray) {
+                return true;
             }
-            else if (x instanceof long[] && y instanceof long[]) {
-                return Arrays.equals((long[]) x, (long[]) y);
+            if (thatArray instanceof double[] && thisArray instanceof double[]) {
+                return Arrays.equals((double[]) thatArray, (double[]) thisArray);
             }
-            else if (x instanceof int[] && y instanceof int[]) {
-                return Arrays.equals((int[]) x, (int[]) y);
+            else if (thatArray instanceof float[] && thisArray instanceof float[]) {
+                return Arrays.equals((float[]) thatArray, (float[]) thisArray);
             }
-            else if (x instanceof short[] && y instanceof short[]) {
-                return Arrays.equals((short[]) x, (short[]) y);
+            else if (thatArray instanceof long[] && thisArray instanceof long[]) {
+                return Arrays.equals((long[]) thatArray, (long[]) thisArray);
             }
-            else if (x instanceof byte[] && y instanceof byte[]) {
-                return Arrays.equals((byte[]) x, (byte[]) y);
+            else if (thatArray instanceof int[] && thisArray instanceof int[]) {
+                return Arrays.equals((int[]) thatArray, (int[]) thisArray);
             }
-            else if (x instanceof boolean[] && y instanceof boolean[]) {
-                return Arrays.equals((boolean[]) x, (boolean[]) y);
+            else if (thatArray instanceof short[] && thisArray instanceof short[]) {
+                return Arrays.equals((short[]) thatArray, (short[]) thisArray);
             }
-            else if (x instanceof char[] && y instanceof char[]) {
-                return Arrays.equals((char[]) x, (char[]) y);
+            else if (thatArray instanceof byte[] && thisArray instanceof byte[]) {
+                return Arrays.equals((byte[]) thatArray, (byte[]) thisArray);
             }
-            else if (x instanceof Object[] && y instanceof Object[]) {
-                return Arrays.equals((Object[]) x, (Object[]) y);
+            else if (thatArray instanceof boolean[] && thisArray instanceof boolean[]) {
+                return Arrays.equals((boolean[]) thatArray, (boolean[]) thisArray);
+            }
+            else if (thatArray instanceof char[] && thisArray instanceof char[]) {
+                return Arrays.equals((char[]) thatArray, (char[]) thisArray);
+            }
+            else if (thatArray instanceof Object[] && thisArray instanceof Object[]) {
+                return Arrays.equals((Object[]) thatArray, (Object[]) thisArray);
             }
         }
-        return $ceylon$language$List$impl().equals(that);
+        return $ceylon$language$List$impl().equals(object);
     }
     
     @Override
     @Transient
     public int hashCode() {
-        //TODO: optimize hash computation to avoid boxing!!
+        java.lang.Object thisArray = this.array;
+        if (thisArray instanceof double[]) {
+            return Arrays.hashCode((double[]) thisArray);
+        }
+        else if (thisArray instanceof float[]) {
+            return Arrays.hashCode((float[]) thisArray);
+        }
+        else if (thisArray instanceof long[]) {
+            return Arrays.hashCode((long[]) thisArray);
+        }
+        else if (thisArray instanceof int[]) {
+            return Arrays.hashCode((int[]) thisArray);
+        }
+        else if (thisArray instanceof short[]) {
+            return Arrays.hashCode((short[]) thisArray);
+        }
+        else if (thisArray instanceof byte[]) {
+            return Arrays.hashCode((byte[]) thisArray);
+        }
+        else if (thisArray instanceof boolean[]) {
+            return Arrays.hashCode((boolean[]) thisArray);
+        }
+        else if (thisArray instanceof char[]) {
+            return Arrays.hashCode((char[]) thisArray);
+        }
+        else if (thisArray instanceof Object[]) {
+            return Arrays.hashCode((Object[]) thisArray);
+        }
         return $ceylon$language$List$impl().hashCode();
     }
     
@@ -2876,9 +2928,9 @@ public final class Array<Element>
     }*/
 
     @Override @Ignore
-    public Iterable<? extends Element, ? extends java.lang.Object> getExceptLast() {
+    public List<? extends Element> getExceptLast() {
         // TODO Auto-generated method stub
-        return $ceylon$language$Iterable$impl().getExceptLast();
+        return $ceylon$language$List$impl().getExceptLast();
     }
 
     @Override @Ignore

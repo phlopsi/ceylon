@@ -65,6 +65,7 @@ public abstract class RepoUsingTool extends CeylonBaseTool {
     protected int timeout = -1;
     protected boolean noDefRepos;
     protected boolean offline;
+    protected List<String> compilerArguments = DefaultToolOptions.getCompilerArguments();
     
     private RepositoryManager rm;
     private RepositoryManager rmoffline;
@@ -172,7 +173,7 @@ public abstract class RepoUsingTool extends CeylonBaseTool {
         this.overrides = mavenOverrides;
     }
 
-    @OptionArgument(longName="overrides", argumentName="file")
+    @OptionArgument(shortName='O', longName="overrides", argumentName="file")
     @Description("Specifies the XML file to use to load module overrides. See http://ceylon-lang.org/documentation/current/reference/repository/maven/ for information. *Experimental*.")
     public void setOverrides(String overrides) {
         this.overrides = overrides;
@@ -370,7 +371,7 @@ public abstract class RepoUsingTool extends CeylonBaseTool {
             if (result != null) {
                 if (forceCompilation || checkCompilation) {
                     String v = result.version() != null ? result.version() : "unversioned";
-                    versions = Collections.singletonList(new ModuleVersionDetails(null, name, v, result.groupId(), result.groupId()));
+                    versions = Collections.singletonList(new ModuleVersionDetails(name, v, result.groupId(), result.groupId()));
                 } else {
                     return (result.version() != null) ? result.version() : "";
                 }
@@ -626,10 +627,11 @@ public abstract class RepoUsingTool extends CeylonBaseTool {
     }
 
     protected boolean shouldRecompile(RepositoryManager repoMgr, String name, String version, ModuleQuery.Type type, boolean checkTime) throws IOException {
-        File artifile = getModuleArtifact(repoMgr, name, version, type);
-        if (artifile == null) {
+        ArtifactResult art = getModuleArtifact(repoMgr, name, version, type);
+        if (art == null) {
             return true;
         }
+        File artifile = art.artifact();
         // Check if it has META-INF/errors.txt
         Properties errors = getMetaInfErrors(artifile);
         if (errors != null && !errors.isEmpty()) {
@@ -641,11 +643,11 @@ public abstract class RepoUsingTool extends CeylonBaseTool {
         return false;
     }
 
-    protected File getModuleArtifact(RepositoryManager repoMgr, String name, String version, ModuleQuery.Type type) {
+    protected ArtifactResult getModuleArtifact(RepositoryManager repoMgr, String name, String version, ModuleQuery.Type type) {
         ArtifactContext ac = new ArtifactContext(null, name, version, type.getSuffixes());
         ac.setIgnoreDependencies(true);
         ac.setThrowErrorIfMissing(false);
-        return repoMgr.getArtifact(ac);
+        return repoMgr.getArtifactResult(ac);
     }
 
     protected Properties getMetaInfErrors(File carFile) {
@@ -721,6 +723,50 @@ public abstract class RepoUsingTool extends CeylonBaseTool {
      * @return
      */
     protected List<File> getSourceDirs() {
+        Type compilerType = getCompilerType();
+        if(compilerType == null)
+            return DefaultToolOptions.getCompilerSourceDirs();
+        return getSourceDirsForCompiler(compilerType);
+    }
+    
+    /**
+     * Override in subclasses that accept compilation before run, this is used
+     * to determine the compiler arguments.
+     * @return the compiler backend, or null to use default compiler arguments
+     */
+    protected ModuleQuery.Type getCompilerType(){
+        return null;
+    }
+    
+    /**
+     * Use in subclasses that accept compilation before run
+     */
+    protected List<File> getSourceDirsForCompiler(ModuleQuery.Type type){
+        List<String> args = new ArrayList<String>(compilerArguments.size()+1);
+        args.addAll(compilerArguments);
+            
+        ToolFactory pluginFactory = new ToolFactory();
+        ToolLoader pluginLoader = new CeylonToolLoader();
+        String toolName;
+        if (type == ModuleQuery.Type.JVM) {
+            toolName = "compile";
+        } else if (type == ModuleQuery.Type.JS) {
+            toolName = "compile-js";
+        } else if (type == ModuleQuery.Type.DART) {
+            toolName = "compile-dart";
+        } else {
+            throw new IllegalArgumentException("Unknown compile flags passed");
+        }
+        try {
+            ToolModel<Tool> model = pluginLoader.loadToolModel(toolName);
+            Tool tool = pluginFactory.bindArguments(model, pluginLoader.<CeylonTool>instance("", null), args);
+            if(tool instanceof RepoUsingTool)
+                return ((RepoUsingTool)tool).getSourceDirs();
+        } catch (NonFatalToolMessage m) {
+            m.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         return DefaultToolOptions.getCompilerSourceDirs();
     }
     
@@ -812,9 +858,10 @@ public abstract class RepoUsingTool extends CeylonBaseTool {
 
     // We only compile in "normal" circumstances, meaning that
     // either no repositories are specified or that the default
-    // output repository (normally "modules") is one of them
-    private boolean compilationPossible() {
-        if (repos != null) {
+    // output repository (normally "modules") is one of them.
+    // We also compile if specific compiler arguments have been set
+    protected boolean compilationPossible() {
+        if (compilerArguments == null && repos != null) {
             List<File> files = FileUtil.pathsToFileList(getRepositoryAsStrings());
             File out = new File(DefaultToolOptions.getCompilerOutputRepo(), "dummy");
             File path = FileUtil.selectPath(files, out.getPath());
@@ -826,6 +873,11 @@ public abstract class RepoUsingTool extends CeylonBaseTool {
     
     protected List<String> getCompilerArguments() {
         List<String> args = new ArrayList<String>();
+        // user-specified overrides every automatic arg
+        if(compilerArguments != null){
+            args.addAll(compilerArguments);
+            return args;
+        }
         if (noDefRepos) {
             args.add("--no-default-repositories");
         }
@@ -857,7 +909,8 @@ public abstract class RepoUsingTool extends CeylonBaseTool {
         if (compileFlags != null) {
             args.add("--include-dependencies=" + compileFlags);
         }
-        if (type == ModuleQuery.Type.JVM) {
+        if (!compileFlags.contains(COMPILE_FORCE)
+                && type == ModuleQuery.Type.JVM) {
             args.add("--incremental");
         }
         args.add(name);

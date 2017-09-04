@@ -1,5 +1,7 @@
 package com.redhat.ceylon.compiler.js.loader;
 
+import static java.util.Collections.singletonList;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -9,7 +11,6 @@ import java.util.Set;
 
 import com.redhat.ceylon.common.Backend;
 import com.redhat.ceylon.common.Backends;
-import com.redhat.ceylon.model.typechecker.model.Annotation;
 import com.redhat.ceylon.model.typechecker.model.Module;
 import com.redhat.ceylon.model.typechecker.model.ModuleImport;
 import com.redhat.ceylon.model.typechecker.model.Package;
@@ -40,8 +41,12 @@ public class JsonModule extends Module implements NpmAware {
             int bits = (int)model.get("$mod-pa");
             setNativeBackends(JsonPackage.hasAnnotationBit(bits, "native") ? Backend.JavaScript.asSet() : Backends.ANY);
         }
-        @SuppressWarnings("unchecked")
-        final Object moduleAnns = model.get("$mod-anns");
+        
+        setModuleAnnotations(model.get("$mod-anns"));
+    }
+    
+    @SuppressWarnings("unchecked")
+    private void setModuleAnnotations(final Object moduleAnns) {
         if (moduleAnns instanceof List) {
             JsonPackage.setNewAnnotations(getAnnotations(), (List<Map<String,List<String>>>)moduleAnns);
         } else if (moduleAnns instanceof Map) {
@@ -50,6 +55,7 @@ public class JsonModule extends Module implements NpmAware {
             throw new IllegalArgumentException("Annotations should be a List (new format) or a Map (old format)");
         }
     }
+    
     public Map<String, Object> getModel() {
         return model;
     }
@@ -99,21 +105,52 @@ public class JsonModule extends Module implements NpmAware {
         // not found
         return null;
     }
+    
+    @Override
+    public List<Package> getPackages() {
+        if (npmPath == null) {
+            return super.getPackages();
+        }
+        else {
+            return singletonList(getRootPackage());
+        }
+    }
+    
+    @Override
+    public Package getRootPackage() {
+        if (npmPath == null) {
+            return super.getRootPackage();
+        }
+        else {
+            return getDirectPackage(getNpmPackageName());
+        }
+    }
 
     @Override
     public Package getDirectPackage(String name) {
-        Package pkg = super.getDirectPackage(name);
-        if (pkg == null && npmPath != null) {
-            String modName = getNameAsString();
-            if (getNameAsString().indexOf('-') > 0) {
-                modName = modName.replace('-', '.');
+        if (npmPath == null) {
+            return super.getDirectPackage(name);
+        }
+        else {
+            if (getNpmPackageName().equals(name)) {
+                Package pkg = super.getDirectPackage(name);
+                if (pkg==null) {
+                    pkg = new NpmPackage(this, name);
+                    super.getPackages().add(pkg);
+                }
+                return pkg;
             }
-            if (modName.equals(name)) {
-                pkg = new NpmPackage(this, name);
-                getPackages().add(pkg);
+            else {
+                return null;
             }
         }
-        return pkg;
+    }
+
+    private String getNpmPackageName() {
+        return getNameAsString()
+                .replace(':', '.')
+                .replace('_', '.')
+                .replace('-', '.');
     }
 
     private Package getPackageFromImport(String name, Module module, Set<Module> visited) {

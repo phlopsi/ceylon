@@ -5,19 +5,16 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.URLConnection;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.jar.JarFile;
 
 import com.redhat.ceylon.common.Versions;
 
@@ -92,7 +89,6 @@ public class CeylonClassLoader extends URLClassLoader {
         // Determine the necessary folders
         File ceylonHome = LauncherUtil.determineHome();
         File ceylonRepo = LauncherUtil.determineRepo(ceylonHome);
-        boolean includeSlf4j = LauncherUtil.isIncludeSlf4j();
 
         // Perform some sanity checks
         checkFolders(ceylonHome, ceylonRepo);
@@ -101,67 +97,40 @@ public class CeylonClassLoader extends URLClassLoader {
 
         // List all the necessary Ceylon JARs and CARs
         String version = LauncherUtil.determineSystemVersion();
-        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.compiler.java", version));
         archives.add(getRepoCar(ceylonRepo, "ceylon.language", version));
         archives.add(getRepoJar(ceylonRepo, "ceylon.runtime", version));
-        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.compiler.js", version));
-        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.typechecker", version));
         archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.common", version));
-        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.cli", version));
         archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.model", version));
+        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.typechecker", version));
+        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.compiler.java", version));
+        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.compiler.js", version));
+        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.cli", version));
+        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.tool.provider", version));
+        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.tools", version));
+        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.langtools.classfile", version));
+        
+        //CMR
         archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.module-loader", version));
         archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.module-resolver", version));
         archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.module-resolver-aether", version)); // optional
-        // sardine depends on slf4j
-        if(includeSlf4j)
-            archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.module-resolver-webdav", version)); // optional
+        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.module-resolver-webdav", version)); // optional
         archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.module-resolver-javascript", version)); // optional
-        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.langtools.classfile", version));
-        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.tool.provider", version));
-        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.tools", version));
+        
+        //JBoss Modules
         archives.add(getRepoJar(ceylonRepo, "org.jboss.modules", Versions.DEPENDENCY_JBOSS_MODULES_VERSION));
         archives.add(getRepoJar(ceylonRepo, "org.jboss.logmanager", Versions.DEPENDENCY_LOGMANAGER_VERSION));
-        // Maven support for CMR
-        archives.add(getRepoJar(ceylonRepo, "org.eclipse.aether.api", "1.1.0")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.eclipse.aether.spi", "1.1.0")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.eclipse.aether.util", "1.1.0")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.eclipse.aether.impl", "1.1.0")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.eclipse.aether.connector.basic", "1.1.0")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.eclipse.aether.transport.file", "1.1.0")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.eclipse.aether.transport.http", "1.1.0")); // optional
-        archives.add(getRepoJar(ceylonRepo, "com.google.guava", "18.0")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.commons.lang3", "3.4")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.maven.maven-artifact", "3.3.9")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.maven.maven-model", "3.3.9")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.maven.maven-model-builder", "3.3.9")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.maven.maven-repository-metadata", "3.3.9")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.maven.maven-builder-support", "3.3.9")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.maven.maven-settings", "3.3.9")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.maven.maven-settings-builder", "3.3.9")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.maven.maven-aether-provider", "3.3.9")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.codehaus.plexus.plexus-interpolation", "1.22")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.codehaus.plexus.plexus-utils", "3.0.22")); // optional
+        
+        // Maven, HTTP, and WebDAV support used by CMR
+        archives.add(getRepoJar(ceylonRepo, "com.redhat.ceylon.aether", "3.3.9")); // optional
 
         // For the typechecker
-        archives.add(getRepoJar(ceylonRepo, "org.antlr.runtime", "3.4"));
+        archives.add(getRepoJar(ceylonRepo, "org.antlr.runtime", "3.5.2"));
         // For the JS backend
-        archives.add(getRepoJar(ceylonRepo, "net.minidev.json-smart", "1.1.1"));
+        archives.add(getRepoJar(ceylonRepo, "net.minidev.json-smart", "1.3.1"));
         // For the "doc" tool
-        archives.add(getRepoJar(ceylonRepo, "org.tautua.markdownpapers.core", "1.2.7"));
+        archives.add(getRepoJar(ceylonRepo, "org.tautua.markdownpapers.core", "1.3.4"));
         archives.add(getRepoJar(ceylonRepo, "com.github.rjeschke.txtmark", "0.13"));
-        // For the --out http:// functionality of the compiler (sardine)
-        if(includeSlf4j){
-            archives.add(getRepoJar(ceylonRepo, "com.github.lookfirst.sardine", "5.1")); // optional
-            archives.add(getRepoJar(ceylonRepo, "org.slf4j.api", "1.6.1")); // optional
-            archives.add(getRepoJar(ceylonRepo, "org.slf4j.simple", "1.6.1")); // optional
-        }
-
-        // For aether and webdav/sardine
-        archives.add(getRepoJar(ceylonRepo, "org.apache.httpcomponents.httpclient", "4.3.2")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.httpcomponents.httpcore", "4.3.2")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.commons.logging", "1.1.1")); // optional
-        archives.add(getRepoJar(ceylonRepo, "org.apache.commons.codec", "1.8")); // optional
-
+        
         return archives;
     }
 
@@ -272,38 +241,5 @@ public class CeylonClassLoader extends URLClassLoader {
             }
         }
         return null;
-    }
-
-    /**
-     * Cleans up any resource associated with this class loader. This class loader will not be usable after calling this
-     * method, so any code using it to run better not be running anymore.
-     * DO NOT call this method "clearCache" as Spring Boot has reserved that name: 
-     * https://github.com/ceylon/ceylon/issues/6681
-     */
-    public void clearCacheButNotWithThisNameToKeepSpringBootHappy() {
-        try {
-            Class<?> klass = java.net.URLClassLoader.class;
-            Field ucp = klass.getDeclaredField("ucp");
-            ucp.setAccessible(true);
-            Object sunMiscURLClassPath = ucp.get(this);
-            Field loaders = sunMiscURLClassPath.getClass().getDeclaredField("loaders");
-            loaders.setAccessible(true);
-            Object collection = loaders.get(sunMiscURLClassPath);
-            for (Object sunMiscURLClassPathJarLoader : ((Collection<?>) collection).toArray()) {
-                try {
-                    Field loader = sunMiscURLClassPathJarLoader.getClass().getDeclaredField("jar");
-                    loader.setAccessible(true);
-                    Object jarFile = loader.get(sunMiscURLClassPathJarLoader);
-                    ((JarFile) jarFile).close();
-                } catch (Throwable t) {
-                    // not a JAR loader?
-                    t.printStackTrace();
-                }
-            }
-        } catch (Throwable t) {
-            // Something's wrong
-            t.printStackTrace();
-        }
-        return;
     }
 }

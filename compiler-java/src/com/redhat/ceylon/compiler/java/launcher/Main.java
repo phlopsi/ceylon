@@ -43,7 +43,6 @@ import java.util.MissingResourceException;
 import com.redhat.ceylon.cmr.api.Overrides;
 import com.redhat.ceylon.common.Constants;
 import com.redhat.ceylon.common.tools.SourceArgumentsResolver;
-import com.redhat.ceylon.compiler.EnvironmentException;
 import com.redhat.ceylon.compiler.java.launcher.Main.ExitState.CeylonState;
 import com.redhat.ceylon.compiler.java.tools.CeylonLocation;
 import com.redhat.ceylon.compiler.java.tools.CeylonLog;
@@ -60,7 +59,6 @@ import com.redhat.ceylon.langtools.tools.javac.jvm.Target;
 import com.redhat.ceylon.langtools.tools.javac.main.CommandLine;
 import com.redhat.ceylon.langtools.tools.javac.main.JavaCompiler;
 import com.redhat.ceylon.langtools.tools.javac.main.Option;
-import com.redhat.ceylon.langtools.tools.javac.main.Main.Result;
 
 import static com.redhat.ceylon.langtools.tools.javac.main.Main.Result.*;
 import com.redhat.ceylon.langtools.tools.javac.processing.AnnotationProcessingError;
@@ -575,6 +573,9 @@ public class Main extends com.redhat.ceylon.langtools.tools.javac.main.Main {
             Context context,
             List<JavaFileObject> fileObjects,
             Iterable<? extends Processor> processors) {
+        context.put(Log.outKey, out);
+        log = CeylonLog.instance(context);
+
         if (options == null) {
             options = Options.instance(context); // creates a new one
         }

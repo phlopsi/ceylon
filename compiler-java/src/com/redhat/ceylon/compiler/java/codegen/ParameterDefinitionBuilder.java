@@ -21,7 +21,6 @@ package com.redhat.ceylon.compiler.java.codegen;
 
 import java.util.Iterator;
 
-import com.redhat.ceylon.compiler.typechecker.tree.Node;
 import com.redhat.ceylon.langtools.tools.javac.code.Flags;
 import com.redhat.ceylon.langtools.tools.javac.tree.JCTree.JCAnnotation;
 import com.redhat.ceylon.langtools.tools.javac.tree.JCTree.JCVariableDecl;
@@ -31,6 +30,7 @@ import com.redhat.ceylon.langtools.tools.javac.util.Name;
 import com.redhat.ceylon.model.typechecker.model.Annotation;
 import com.redhat.ceylon.model.typechecker.model.Function;
 import com.redhat.ceylon.model.typechecker.model.FunctionOrValue;
+import com.redhat.ceylon.model.typechecker.model.ModelUtil;
 import com.redhat.ceylon.model.typechecker.model.Parameter;
 import com.redhat.ceylon.model.typechecker.model.ParameterList;
 
@@ -61,7 +61,7 @@ public class ParameterDefinitionBuilder {
 
     private FunctionOrValue boxedVariable;
 
-    private Node at;
+//    private Node at;
 
     private ParameterDefinitionBuilder(AbstractTransformer gen, String name) {
         this.gen = gen;
@@ -141,10 +141,12 @@ public class ParameterDefinitionBuilder {
     }
 
     static boolean isBoxedVariableParameter(Parameter parameter) {
-        return parameter.getModel().isCaptured()
-                && parameter.getModel().isVariable()
-                && (!parameter.getModel().isClassOrInterfaceMember() || Decl.isLocalToInitializer(parameter.getModel()))
-                && !parameter.isHidden();
+        FunctionOrValue model = parameter.getModel();
+        return model.isCaptured()
+            && model.isVariable()
+            && (!model.isClassOrInterfaceMember() 
+                    || ModelUtil.isLocalToInitializer(model))
+            && !parameter.isHidden();
     }
 
     public ParameterDefinitionBuilder modifiers(long mods) {
@@ -276,8 +278,8 @@ public class ParameterDefinitionBuilder {
         return sb.toString();
     }
 
-    public void at(Node node) {
-        this.at = node;
-    }
+//    public void at(Node node) {
+//        this.at = node;
+//    }
     
 }

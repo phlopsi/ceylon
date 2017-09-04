@@ -2,6 +2,7 @@ package com.redhat.ceylon.compiler.typechecker.analyzer;
 
 import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.correctionMessage;
 import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.getPackageTypeDeclaration;
+import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.getPackageTypedDeclaration;
 import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.getTypeArguments;
 import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.getTypeDeclaration;
 import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.getTypeMember;
@@ -18,7 +19,7 @@ import static com.redhat.ceylon.model.typechecker.model.ModelUtil.getNativeDecla
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.getNativeHeader;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.intersection;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.intersectionOfSupertypes;
-import static com.redhat.ceylon.model.typechecker.model.ModelUtil.isNativeImplementation;
+import static com.redhat.ceylon.model.typechecker.model.ModelUtil.isNativeForWrongBackend;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.isTypeUnknown;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.union;
 import static com.redhat.ceylon.model.typechecker.model.SiteVariance.IN;
@@ -43,7 +44,6 @@ import com.redhat.ceylon.model.typechecker.model.Declaration;
 import com.redhat.ceylon.model.typechecker.model.Function;
 import com.redhat.ceylon.model.typechecker.model.FunctionOrValue;
 import com.redhat.ceylon.model.typechecker.model.Interface;
-import com.redhat.ceylon.model.typechecker.model.ModelUtil;
 import com.redhat.ceylon.model.typechecker.model.NothingType;
 import com.redhat.ceylon.model.typechecker.model.Parameter;
 import com.redhat.ceylon.model.typechecker.model.Scope;
@@ -91,10 +91,6 @@ public class TypeVisitor extends Visitor {
     
     @Override public void visit(Tree.CompilationUnit that) {
         unit = that.getUnit();
-        super.visit(that);
-    }
-    
-    @Override public void visit(Tree.Declaration that) {
         super.visit(that);
     }
     
@@ -393,8 +389,7 @@ public class TypeVisitor extends Visitor {
                         null, false, unit);
             }
             if (type==null) {
-                if (!isNativeForWrongBackend(
-                        scope.getScopedBackends())) {
+                if (!isNativeForWrongBackend(scope, unit)) {
                     that.addError("type is not defined: '" 
                             + name + "'" 
                             + correctionMessage(name, scope, 
@@ -488,8 +483,7 @@ public class TypeVisitor extends Visitor {
                         getTypeMember(d, name, 
                                 null, false, unit, scope);
                 if (type==null) {
-                    if (!isNativeForWrongBackend(
-                            scope.getScopedBackends())) {
+                    if (!isNativeForWrongBackend(scope, unit)) {
                         if (d.isMemberAmbiguous(name, unit, null, false)) {
                             that.addError("member type declaration is ambiguous: '" + 
                                     name + "' for type '" + 
@@ -1052,10 +1046,10 @@ public class TypeVisitor extends Visitor {
     }
     
     private boolean isInitializerParameter(FunctionOrValue dec) {
-        return dec!=null && 
-                dec.isParameter() && 
-                dec.getInitializerParameter()
-                    .isHidden();
+        return dec!=null 
+            && dec.isParameter() 
+            && dec.getInitializerParameter()
+                .isHidden();
     }
     
     @Override
@@ -1070,10 +1064,11 @@ public class TypeVisitor extends Visitor {
                         dec.getName() + "'");
             }
         }
-        if (sie==null && isNativeImplementation(dec)) {
-            that.addError("missing body for native function: '" + 
-                    dec.getName() + "' must have a body");
-        }
+        //unnecessary, let definite assignment checking handle it!
+//        if (sie==null && isNativeImplementation(dec)) {
+//            that.addError("missing body for native function: '" + 
+//                    dec.getName() + "' must have a body");
+//        }
     }
     
     @Override
@@ -1107,10 +1102,11 @@ public class TypeVisitor extends Visitor {
                         dec.getName() + "'");
             }
         }
-        if (sie==null && isNativeImplementation(dec)) {
-            that.addError("missing body for native value: '" + 
-                    dec.getName() + "' must have a body");
-        }
+        //unnecessary, let definite assignment checking handle it!
+//        if (sie==null && isNativeImplementation(dec)) {
+//            that.addError("missing body for native value: '" + 
+//                    dec.getName() + "' must have a body");
+//        }
     }
     
     @Override
@@ -1349,7 +1345,7 @@ public class TypeVisitor extends Visitor {
         TypeDeclaration td = 
                 (TypeDeclaration) 
                     that.getScope();
-        List<Tree.BaseMemberExpression> bmes = 
+        List<Tree.StaticMemberOrTypeExpression> bmes = 
                 that.getBaseMemberExpressions();
         List<Tree.StaticType> cts = that.getTypes();
         List<TypedDeclaration> caseValues = 
@@ -1364,12 +1360,15 @@ public class TypeVisitor extends Visitor {
             }
         }
         else {
-            for (Tree.BaseMemberExpression bme: bmes) {
+            for (Tree.StaticMemberOrTypeExpression bme: bmes) {
                 //bmes have not yet been resolved
+                String name = name(bme.getIdentifier());
                 TypedDeclaration od = 
-                        getTypedDeclaration(bme.getScope(), 
-                                name(bme.getIdentifier()), 
-                                null, false, bme.getUnit());
+                        bme instanceof Tree.BaseMemberExpression ?
+                        getTypedDeclaration(bme.getScope(), name, 
+                                null, false, unit) :
+                        getPackageTypedDeclaration(name, 
+                                null, false, unit);
                 if (od!=null) {
                     caseValues.add(od);
                     Type type = od.getType();
@@ -1685,7 +1684,4 @@ public class TypeVisitor extends Visitor {
         return hdr;
     }
     
-    private boolean isNativeForWrongBackend(Backends backends) {
-        return ModelUtil.isNativeForWrongBackend(backends, unit.getSupportedBackends());
-    }
 }

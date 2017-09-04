@@ -7,7 +7,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import com.redhat.ceylon.cmr.api.AbstractDependencyResolverAndModuleInfoReader;
 import com.redhat.ceylon.cmr.api.ArtifactContext;
 import com.redhat.ceylon.cmr.api.CmrRepository;
 import com.redhat.ceylon.cmr.api.ModuleDependencyInfo;
@@ -40,18 +39,24 @@ public class NpmRepository extends AbstractRepository {
     }
 
     protected List<String> getDefaultParentPathInternal(ArtifactContext context) {
-        //npm simply creates a dir with the module name and puts files inside
-        final String name = context.getName();
-        final List<String> tokens = new ArrayList<String>();
-        tokens.addAll(Arrays.asList(name.split("\\.")));
-        return tokens;
+        String name = context.getName();
+        int index = name.indexOf(':');
+        if (index <= 0) {
+            //npm simply creates a dir with the module name and puts files inside
+            return Arrays.asList(name);
+        } else {
+            //for a scoped module, the dir is inside the scope dir
+            return Arrays.asList("@" + name.substring(0, index), 
+                                 name.substring(index+1));
+        }
     }
 
     public String[] getArtifactNames(ArtifactContext context) {
         List<String> suffixes = Arrays.asList(context.getSuffixes());
         if (suffixes.contains(ArtifactContext.JS)
                 || suffixes.contains(ArtifactContext.JS_MODEL)) {
-            return getArtifactNames(context.getName(), context.getVersion(), new String[] { ArtifactContext.JS, ArtifactContext.NPM_DESCRIPTOR });
+            return getArtifactNames(context.getName(), context.getVersion(), 
+                    new String[] { ArtifactContext.JS, ArtifactContext.NPM_DESCRIPTOR });
         } else {
             return new String[0];
         }
@@ -90,7 +95,11 @@ public class NpmRepository extends AbstractRepository {
             store.setPathForRunningNpm(npmCommand);
         }
     }
-    
+
+    public Node findParent(ArtifactContext context) {
+        return NodeUtils.getNode(getRoot(), getDefaultParentPath(context));
+    }
+
     private static class NpmArtifactResult extends AbstractArtifactResult {
         private RepositoryManager manager;
         private Node node;
@@ -134,7 +143,7 @@ public class NpmRepository extends AbstractRepository {
             if (infos == null || infos.getDependencies().isEmpty())
                 return Collections.emptyList();
 
-            final List<ArtifactResult> results = new ArrayList<ArtifactResult>();
+            final List<ArtifactResult> results = new ArrayList<>();
             for (ModuleDependencyInfo mi : getOrderedDependencies(infos)) {
                 results.add(new LazyArtifactResult(manager,
                         mi.getNamespace(),
@@ -148,7 +157,7 @@ public class NpmRepository extends AbstractRepository {
         }
 
         private List<ModuleDependencyInfo> getOrderedDependencies(ModuleInfo infos) {
-            List<ModuleDependencyInfo> dependencies = new ArrayList<ModuleDependencyInfo>(infos.getDependencies());
+            List<ModuleDependencyInfo> dependencies = new ArrayList<>(infos.getDependencies());
             for (int index = 0; index < dependencies.size(); index++) {
                 ModuleDependencyInfo dep = dependencies.get(index);
                 if ("ceylon.language".equals(dep.getName())) {

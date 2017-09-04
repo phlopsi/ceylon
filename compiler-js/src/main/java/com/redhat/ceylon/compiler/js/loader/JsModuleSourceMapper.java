@@ -70,12 +70,18 @@ public class JsModuleSourceMapper extends ModuleSourceMapper {
                         if ("1.1.0".equals(depv)) {
                             depv = "1.2.0";
                         } else if ("1.2.1".equals(depv)) {
-                            depv = "1.3.3-SNAPSHOT";
+                            depv = Versions.CEYLON_VERSION_NUMBER;
                         } else if ("1.2.2".equals(depv)) {
-                            depv = "1.3.3-SNAPSHOT";
+                            depv = Versions.CEYLON_VERSION_NUMBER;
                         } else if ("1.3.0".equals(depv)) {
-                            depv = "1.3.3-SNAPSHOT";
-                        }
+                            depv = Versions.CEYLON_VERSION_NUMBER;
+                        } else if ("1.3.1".equals(depv)) {
+                            depv = Versions.CEYLON_VERSION_NUMBER;
+                        } else if ("1.3.2".equals(depv)) {
+                            depv = Versions.CEYLON_VERSION_NUMBER;
+                        } else if ("1.3.3".equals(depv)) {
+                            depv = Versions.CEYLON_VERSION;
+                        } /*@NEW_VERSION@*/
                     }
                 } else {
                     depuri = s;
@@ -90,6 +96,8 @@ public class JsModuleSourceMapper extends ModuleSourceMapper {
                 module.addImport(imp);
             }
             model.remove("$mod-deps");
+            
+            overrideModuleImports(module, artifact);
         }
         ((JsonModule)module).setModel(model);
         ((JsonModule)module).loadDeclarations();
@@ -173,7 +181,6 @@ public class JsModuleSourceMapper extends ModuleSourceMapper {
                     module.setJsMajor(Versions.JS_BINARY_MAJOR_VERSION);
                     module.setJsMinor(Versions.JS_BINARY_MINOR_VERSION);
                 } catch (IOException ex) {
-                    System.out.println("ay no mames");
                     ex.printStackTrace();
                 }
                 return;

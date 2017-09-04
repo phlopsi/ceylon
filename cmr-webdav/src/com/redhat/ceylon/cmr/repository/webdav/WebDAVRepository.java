@@ -22,18 +22,18 @@ import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.http.ProtocolException;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.config.Registry;
-import org.apache.http.config.SocketConfig;
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.conn.socket.ConnectionSocketFactory;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import com.redhat.ceylon.aether.apache.http.ProtocolException;
+import com.redhat.ceylon.aether.apache.http.client.ClientProtocolException;
+import com.redhat.ceylon.aether.apache.http.config.Registry;
+import com.redhat.ceylon.aether.apache.http.config.SocketConfig;
+import com.redhat.ceylon.aether.apache.http.conn.HttpClientConnectionManager;
+import com.redhat.ceylon.aether.apache.http.conn.socket.ConnectionSocketFactory;
+import com.redhat.ceylon.aether.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 
-import com.github.sardine.DavResource;
-import com.github.sardine.impl.SardineException;
-import com.github.sardine.impl.SardineImpl;
-import com.github.sardine.impl.io.ContentLengthInputStream;
+import com.redhat.ceylon.aether.github.sardine.DavResource;
+import com.redhat.ceylon.aether.github.sardine.impl.SardineException;
+import com.redhat.ceylon.aether.github.sardine.impl.SardineImpl;
+import com.redhat.ceylon.aether.github.sardine.impl.io.ContentLengthInputStream;
 
 /**
  * WebDAV content store.

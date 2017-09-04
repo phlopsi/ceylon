@@ -2,41 +2,36 @@ package com.redhat.ceylon.tools.war;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Properties;
 import java.util.Set;
+import java.util.jar.Attributes;
 import java.util.jar.JarOutputStream;
-import java.util.zip.ZipEntry;
+import java.util.jar.Manifest;
 
 import com.redhat.ceylon.cmr.api.ModuleQuery;
 import com.redhat.ceylon.cmr.ceylon.loader.ModuleGraph;
 import com.redhat.ceylon.cmr.ceylon.loader.ModuleGraph.Module;
-import com.redhat.ceylon.cmr.impl.IOUtils;
 import com.redhat.ceylon.common.ModuleSpec;
 import com.redhat.ceylon.common.ModuleUtil;
 import com.redhat.ceylon.common.Versions;
 import com.redhat.ceylon.common.tool.Argument;
 import com.redhat.ceylon.common.tool.Description;
+import com.redhat.ceylon.common.tool.Hidden;
 import com.redhat.ceylon.common.tool.Option;
 import com.redhat.ceylon.common.tool.OptionArgument;
-import com.redhat.ceylon.common.tool.RemainingSections;
 import com.redhat.ceylon.common.tool.Summary;
 import com.redhat.ceylon.common.tool.ToolUsageError;
-import com.redhat.ceylon.common.tools.OutputRepoUsingTool;
 import com.redhat.ceylon.model.cmr.ArtifactResult;
 import com.redhat.ceylon.model.cmr.ModuleScope;
 import com.redhat.ceylon.model.loader.JvmBackendUtil;
-import com.redhat.ceylon.tools.moduleloading.ModuleLoadingTool;
+import com.redhat.ceylon.tools.moduleloading.ResourceRootTool;
 
 @Summary("Generates a WAR file from a compiled `.car` file")
 @Description("Generates a WAR file from the `.car` file of the "
@@ -50,44 +45,19 @@ import com.redhat.ceylon.tools.moduleloading.ModuleLoadingTool;
         + "the application container "
         + "(and thus not required to be in `WEB-INF/lib`) can be "
         + "excluded using `--provided-module`.")
-@RemainingSections( "## Static metamodel or WarInitializer \n\n" +
-        "Ceylon can set up the run-time metamodel using either " +
-        "a listener " + 
-        "(ceylon.war.WarInitializer) that is " +
-        "set in the default web.xml. Or by generating a static metamodel " + 
-        "file.\n\n" +
-        "## Static metamodel \n\n" +
-        "If you want to run on WildFly or other application servers that remove provided jars from "+
-        "the `lib/` folder, you should try the `--static-metamodel` argument and marking your provided "+
-        "modules with `--provided-module`.\n\n"+
-        "## WarInitializer \n\n" +
-        "On non-WildFly application servers you should leave `ceylon war` do the default of generating "+
-        "a `web.xml` file for you which will call the `WarInitializer` listener to set up the metamodel "+
-        "based on the contents of the `lib/` folder at run-time.\n\n"+
-        "### Overriding web.xml\n\n" +
-        "If you provide a custom `WEB-INF/web.xml` file in your WAR " +
-        "resource-root, you'll need to include the listener " + 
-        "(ceylon.war.WarInitializer) that is " +
-        "set in the default web.xml. Without that listener, the " + 
-        "metamodel will not be properly initialized.\n\n"+
-        OutputRepoUsingTool.DOCSECTION_REPOSITORIES)
-public class CeylonWarTool extends ModuleLoadingTool {
+public class CeylonWarTool extends ResourceRootTool {
 
-    static final String WAR_MODULE = "com.redhat.ceylon.war";
-    
     private List<ModuleSpec> modules;
-    private final List<EntrySpec> entrySpecs = new ArrayList<>();
     private final List<String> excludedModules = new ArrayList<>();
     private final List<String> providedModules = new ArrayList<>();
     private String out = null;
     private String name = null;
-    private String resourceRoot;
-    private boolean staticMetamodel;
     
+    @Hidden
     @Option(longName="static-metamodel")
-    @Description("Generate a static metamodel, skip the WarInitializer (default: false).")
-    public void setStaticMetamodel(boolean staticMetamodel) {
-        this.staticMetamodel = staticMetamodel;
+    @Description("Obsolete: Generate a static metamodel, skip the WarInitializer (always true).")
+    public void setStaticMetamodel(boolean staticMetamodel) throws IOException {
+        append("WARNING: --static-metamodel option no longer supported: enabled by default").newline();
     }
 
     @Argument(argumentName="module", multiplicity="+")
@@ -109,13 +79,6 @@ public class CeylonWarTool extends ModuleLoadingTool {
     @Description("Sets name of the WAR file (default: moduleName-version.war)")
     public void setName(String name) {
         this.name = name;
-    }
-    
-    @OptionArgument(shortName='R', argumentName="directory")
-    @Description("Sets the special resource directory whose files will " +
-            "end up in the root of the resulting WAR file (default: web-content).")
-    public void setResourceRoot(String root) {
-        this.resourceRoot = root;
     }
     
     @OptionArgument(argumentName="moduleOrFile", shortName='x')
@@ -179,7 +142,6 @@ public class CeylonWarTool extends ModuleLoadingTool {
     public void run() throws Exception {
         String moduleName = null;
         String moduleVersion = null;
-        final Properties properties = new Properties();
         
         for (ModuleSpec module : modules) {
             String name = module.getName();
@@ -202,29 +164,12 @@ public class CeylonWarTool extends ModuleLoadingTool {
             }
         }
 
-        // only require the war module if not using a static metamodel
-        if (!staticMetamodel
-                && !loadModule(null, WAR_MODULE, Versions.CEYLON_VERSION_NUMBER)) {
-            throw new ToolUsageError(CeylonWarMessages.msg("abort.missing.modules"));
-        }
         loader.resolve();
 
         List<ArtifactResult> staticMetamodelEntries = new ArrayList<>();
         addLibEntries(staticMetamodelEntries);
         
-        properties.setProperty("moduleName", moduleName);
-        properties.setProperty("moduleVersion", moduleVersion);
-        
-        addSpec(new PropertiesEntrySpec(properties, "META-INF/module.properties"));    
-        
-        if (!addResources(entrySpecs) && !staticMetamodel) {
-            // we only add this if there's no static metamodel
-            debug("adding.entry", "default web.xml");
-            addSpec(new URLEntrySpec(CeylonWarTool.class
-                            .getClassLoader()
-                            .getResource("com/redhat/ceylon/tools/war/resources/default-web.xml"),
-                            "WEB-INF/web.xml"));
-        }
+        addResources();
         
         if (this.name == null) {
             this.name = moduleVersion != null && !moduleVersion.isEmpty() 
@@ -249,21 +194,17 @@ public class CeylonWarTool extends ModuleLoadingTool {
 
     @Override
     protected boolean shouldExclude(String moduleName, String version) {
-        return super.shouldExclude(moduleName, version) ||
-                this.excludedModules.contains(moduleName);
+        return super.shouldExclude(moduleName, version) 
+            || this.excludedModules.contains(moduleName);
     }
 
     @Override
     protected boolean isProvided(String moduleName, String version) {
         return super.isProvided(moduleName, version)
-                || this.providedModules.contains(moduleName);
+            || this.providedModules.contains(moduleName);
     }
     
-    protected void addSpec(EntrySpec spec) {
-        debug("adding.entry", spec.name);
-        this.entrySpecs.add(spec);
-    }
-    
+    @Override
     protected void debug(String key, Object... args) {
         if (this.verbose != null &&
                 !this.verbose.equals("loader")) {
@@ -275,52 +216,11 @@ public class CeylonWarTool extends ModuleLoadingTool {
         }
     }
     
-    /** 
-     * Copies resources from the {@link #resourceRoot} to the WAR.
-     * @return true if a web.xml was added
-     */
-    protected boolean addResources(List<EntrySpec> entries) throws MalformedURLException {
-        final File root;
-        if (this.resourceRoot == null) {
-            File defaultRoot = applyCwd(new File("web-content"));
-            if (!defaultRoot.exists()) {
-                return false;
-            }
-            root = defaultRoot;
-        } else {
-            root = applyCwd(new File(this.resourceRoot));
-        }
-        if (!root.exists()) {
-            throw new ToolUsageError(CeylonWarMessages.msg("resourceRoot.missing", root.getAbsolutePath()));
-        }
-        if (!root.isDirectory()) {
-            throw new ToolUsageError(CeylonWarMessages.msg("resourceRoot.nondir", root.getAbsolutePath()));
-        }
-        debug("adding.resources", root.getAbsolutePath());
-        
-        return addResources(root, "", entries);
+    @Override
+    protected void usageError(String key, Object... args) {
+        throw new ToolUsageError(CeylonWarMessages.msg("resourceRoot.missing", args));
     }
-    
-    // returns true if a web.xml was added
-    protected boolean addResources(File root, String prefix, List<EntrySpec> entries) throws MalformedURLException {
-        boolean webXmlAdded = false;
-        for (File f : root.listFiles()) {
-            if (f.isDirectory()) {
-                webXmlAdded = webXmlAdded || addResources(f, prefix + f.getName() + "/", entries);
-            } else {
-                addSpec(new URLEntrySpec(f.toURI().toURL(), prefix + f.getName()));
-                
-                if (f.getName().equals("web.xml") && 
-                        prefix.equals("WEB-INF/")) {
-                    debug("found.webxml");
-                    webXmlAdded = true;
-                }
-            }
-        }
-        
-        return webXmlAdded;
-    }
-    
+
     protected void addLibEntries(final List<ArtifactResult> staticMetamodelEntries) throws MalformedURLException { 
         final List<String> libs = new ArrayList<>();
 
@@ -362,91 +262,25 @@ public class CeylonWarTool extends ModuleLoadingTool {
                 }
             }
         });
-
-        // store the list of added libs so the WarInitializer knows what to copy out
-        // to a repo if one has to be created
-        final StringBuffer libList = new StringBuffer();
-        for (String lib : libs) {
-            libList.append(lib).append("\n");
-        }
-        addSpec(new StringEntrySpec(libList.toString(), "META-INF/libs.txt"));
     }
     
     protected void writeJarFile(File jarFile, List<ArtifactResult> staticMetamodelEntries) throws IOException {
-        try (JarOutputStream out = 
-                new JarOutputStream(new 
-                        BufferedOutputStream(new 
-                                FileOutputStream(jarFile)))) {
-            for (EntrySpec entry : entrySpecs) {
-                entry.write(out);
-            }
-            if(staticMetamodel){
-                // FIXME: this is not done properly
-                Set<String> added = new HashSet<>();
-                JvmBackendUtil.writeStaticMetamodel(out, added, staticMetamodelEntries, jdkProvider, 
-                        new HashSet<>(providedModules));
-            }
+        Manifest manifest = new Manifest();
+        Attributes mainAttributes = manifest.getMainAttributes();
+        writeManifestEntries(mainAttributes);
+        
+        try (BufferedOutputStream out = 
+                new BufferedOutputStream(new FileOutputStream(jarFile));
+             JarOutputStream zipFile = 
+                mainAttributes.isEmpty() 
+                        ? new JarOutputStream(out) 
+                        : new JarOutputStream(out, manifest)) {
+            writeResources(zipFile);
+            // FIXME: this is not done properly
+            Set<String> added = new HashSet<>();
+            JvmBackendUtil.writeStaticMetamodel(zipFile, added, staticMetamodelEntries, jdkProvider, 
+                    new HashSet<>(providedModules));
         }
     }
     
-    abstract class EntrySpec {
-        EntrySpec(final String name) {
-            this.name = name;
-        }
-        
-        void write(final JarOutputStream out) throws IOException {
-            out.putNextEntry(new ZipEntry(this.name));
-            IOUtils.copyStream(openStream(), out, true, false);
-        }
-        
-        abstract InputStream openStream() throws IOException;
-        
-        final protected String name; 
-    }
-    
-    class URLEntrySpec extends EntrySpec {
-        URLEntrySpec(final URL url, final String name) {
-            super(name);
-            this.url = url;
-        }
-        
-        InputStream openStream() throws IOException {
-            return this.url.openStream();
-        }
-        
-        final private URL url;
-    }
-    
-    class StringEntrySpec extends EntrySpec {
-        StringEntrySpec(final String content, final String name) {
-            super(name);
-            this.content = content;
-        }
-        
-        InputStream openStream() throws IOException {
-            return new ByteArrayInputStream(this.content.getBytes());
-        }
-    
-        final private String content;
-    }
-
-    class PropertiesEntrySpec extends EntrySpec {
-
-        PropertiesEntrySpec(final Properties properties, final String name) {
-            super(name);
-            this.properties = properties;
-        }
-        
-        void write(final JarOutputStream out) throws IOException {
-            out.putNextEntry(new ZipEntry(this.name));
-            this.properties.store(out, "");
-        }
-        
-        InputStream openStream() throws IOException {
-            //unused
-            return null;
-        }
-        
-        final private Properties properties;
-    }
 }

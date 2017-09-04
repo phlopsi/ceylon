@@ -1031,6 +1031,10 @@ public class Attr extends JCTree.Visitor {
                     }
                 }
 
+                if((owner.flags() & INTERFACE) != 0
+                        && m.isStatic())
+                    chk.checkStaticInterfaceMethod(tree);
+                
                 // Attribute all type annotations in the body
                 memberEnter.typeAnnotate(tree.body, localEnv, m, null);
                 annotate.flush();
@@ -4343,6 +4347,7 @@ public class Attr extends JCTree.Visitor {
                     && tree.stats != null
                     && !tree.stats.isEmpty())
                 tree.type = tree.type.baseType();
+            result = tree.type;
         }finally{
             // exit the LET scope
             localEnv.info.scope.leave();

@@ -327,9 +327,7 @@ public final class Float
     @TypeInfo("ceylon.language::Float|ceylon.language::ParseException")
     public static java.lang.Object parse(
             @Name("string") java.lang.String string) {
-        Float result = parseFloat_.parseFloat(string);
-        return result!=null ? result :
-            new ParseException("illegal format for Float");
+        return parseFloatInternal_.parseFloatInternal(string);
     }
     
     @Ignore
@@ -358,7 +356,7 @@ public final class Float
     }
     
     @Ignore
-    public final int format$decimalSeparator(double f, final long minDecimalPlaces, final long maxDecimalPlaces) {
+    public static final int format$decimalSeparator(double f, final long minDecimalPlaces, final long maxDecimalPlaces) {
         return 46;
     }
     
@@ -368,7 +366,7 @@ public final class Float
     }
     
     @Ignore
-    public final ceylon.language.Character format$thousandsSeparator(double f, final long minDecimalPlaces, final long maxDecimalPlaces, final int decimalSeparator) {
+    public static final ceylon.language.Character format$thousandsSeparator(double f, final long minDecimalPlaces, final long maxDecimalPlaces, final int decimalSeparator) {
         return null;
     }
         

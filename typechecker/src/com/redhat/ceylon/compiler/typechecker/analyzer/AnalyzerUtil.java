@@ -4,7 +4,11 @@ import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.formatPath;
 import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.hasError;
 import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.name;
 import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.unwrapExpressionUntilTerm;
+import static com.redhat.ceylon.model.loader.JvmBackendUtil.isInitialLowerCase;
+import static com.redhat.ceylon.model.loader.NamingBase.capitalize;
+import static com.redhat.ceylon.model.loader.NamingBase.getJavaBeanName;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.appliedType;
+import static com.redhat.ceylon.model.typechecker.model.ModelUtil.getContainingClassOrInterface;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.intersectionType;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.isConstructor;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.isForBackend;
@@ -26,13 +30,12 @@ import java.util.Map;
 import java.util.Set;
 
 import com.redhat.ceylon.common.Backend;
+import com.redhat.ceylon.common.Backends;
 import com.redhat.ceylon.compiler.typechecker.tree.Node;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree.ClassBody;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree.TypeVariance;
 import com.redhat.ceylon.compiler.typechecker.util.NormalizedLevenshtein;
-import com.redhat.ceylon.model.loader.JvmBackendUtil;
-import com.redhat.ceylon.model.loader.NamingBase;
 import com.redhat.ceylon.model.typechecker.model.Cancellable;
 import com.redhat.ceylon.model.typechecker.model.Class;
 import com.redhat.ceylon.model.typechecker.model.ClassOrInterface;
@@ -43,6 +46,7 @@ import com.redhat.ceylon.model.typechecker.model.Generic;
 import com.redhat.ceylon.model.typechecker.model.Interface;
 import com.redhat.ceylon.model.typechecker.model.Module;
 import com.redhat.ceylon.model.typechecker.model.ModuleImport;
+import com.redhat.ceylon.model.typechecker.model.NothingType;
 import com.redhat.ceylon.model.typechecker.model.Package;
 import com.redhat.ceylon.model.typechecker.model.Parameter;
 import com.redhat.ceylon.model.typechecker.model.ParameterList;
@@ -72,29 +76,108 @@ public class AnalyzerUtil {
     
     static final List<Type> NO_TYPE_ARGS = emptyList();
     
+    static final Map<TypeParameter,Type> NO_SUBSTITUTIONS = 
+            Collections.<TypeParameter,Type>emptyMap();
+
+    private static Declaration getMemberInheritedFromOuterTypes(
+            TypeDeclaration td, String name, 
+            List<Type> signature, boolean variadic, 
+            Scope scope) {
+        ClassOrInterface cci = 
+                getContainingClassOrInterface(scope);
+        while (cci!=null) { 
+            if (!(td instanceof NothingType) 
+                    && td.inherits(cci)) {
+                //just in case the current class is a 
+                //superclass of the receiver type, and
+                //has a private member with the given
+                //name, check the current class
+                Declaration direct = 
+                        cci.getDirectMember(name, 
+                                signature, variadic);
+                if (direct!=null) {
+                    //ignore it if shared, since it
+                    //might be refined by the subtype
+                    return direct.isShared() ? null : direct;
+                }
+            }
+            cci = getContainingClassOrInterface(
+                    cci.getContainer());
+        }
+        return null;
+    }
+    
+    private static boolean transformNameForJava(
+            TypeDeclaration td, Scope scope, String name, 
+            Boolean type) {
+        // If this is a Java type, it might have 
+        // members that follow the "wrong" naming
+        // convention
+        return td.isJava()
+            && isForBackend(scope.getScopedBackends(), 
+                            Backend.Java)
+            && type==isInitialLowerCase(name);
+    }
+
+    private static Declaration getFromJava(String name, 
+            Scope scope, List<Type> signature, boolean ellipsis,
+            Unit unit) {
+        // This method is used for base members, not qualified members
+        // so we don't look for members but we look on the scope, which
+        // may contain values with the modified case. For example, given
+        // import Foo { ... } which contains a \iBAR we map to "bar",
+        // if we look on the scope for "bar" we may find one that is not
+        // the one we wanted to import, so try imports first.
+        Declaration result = 
+                unit.getImportedDeclaration(name, 
+                        signature, ellipsis);
+        if (result!=null && result.isJava()) {
+            return result;
+        }
+        result = 
+                scope.getMemberOrParameter(unit, 
+                        name, signature, ellipsis);
+        if (result!=null && result.isJava()) {
+            return result;
+        }
+        return null;
+    }
+    
+    private static boolean transformNameForJava(
+            Scope scope, String name, 
+            Boolean type) {
+        // We might have imported members of a Java type, 
+        // that follow the "wrong" naming convention
+        return isForBackend(scope.getScopedBackends(), 
+                            Backend.Java)
+            && type==isInitialLowerCase(name);
+    }
+
     static TypedDeclaration getTypedMember(TypeDeclaration td, 
             String name, List<Type> signature, boolean variadic, 
             Unit unit, Scope scope) {
 
         Declaration member = 
-                td.getImportedMember(scope, name, signature, variadic);
+                getMemberInheritedFromOuterTypes(td, name, 
+                        signature, variadic, scope);
         if (member==null) {
-            member = td.getMember(name, unit, signature, variadic);
+            member = td.getImportedMember(scope, name, 
+                    signature, variadic);
+        }
+        if (member==null) {
+            member = td.getMember(name, unit, 
+                    signature, variadic);
+        }
+        if (member==null 
+                && transformNameForJava(td, scope, name, false)) {
+            member = td.getMember(getJavaBeanName(name), 
+                    unit, signature, variadic);
         }
         
         if (member instanceof TypedDeclaration) {
             return (TypedDeclaration) member;
         }
         else {
-            if (td.isJava()
-                    && isForBackend(scope.getScopedBackends(), Backend.Java) 
-                    && !JvmBackendUtil.isInitialLowerCase(name)) {
-                name = NamingBase.getJavaBeanName(name);
-                member = td.getMember(name, unit, signature, variadic);
-                if (member instanceof TypedDeclaration) {
-                    return (TypedDeclaration) member;
-                }
-            }
             return null;
         }
     }
@@ -104,9 +187,20 @@ public class AnalyzerUtil {
             Unit unit, Scope scope) {
         
         Declaration member = 
-                td.getImportedMember(scope, name, signature, variadic);
+                getMemberInheritedFromOuterTypes(td, name, 
+                        signature, variadic, scope);
         if (member==null) {
-            member = td.getMember(name, unit, signature, variadic);
+            member = td.getImportedMember(scope, name, 
+                    signature, variadic);
+        }
+        if (member==null) {
+            member = td.getMember(name, unit, 
+                    signature, variadic);
+        }
+        if (member==null 
+                && transformNameForJava(td, scope, name, true)) {
+            member = td.getMember(capitalize(name), 
+                    unit, signature, variadic);
         }
         
         if (member instanceof TypeDeclaration) {
@@ -117,20 +211,6 @@ public class AnalyzerUtil {
                     (TypedDeclaration) member);
         }
         else {
-            if (td.isJava()
-                    && isForBackend(scope.getScopedBackends(), Backend.Java) 
-                    && JvmBackendUtil.isInitialLowerCase(name)) {
-                name = NamingBase.capitalize(name);
-                member = 
-                        td.getMember(name, unit, signature, variadic);
-                if (member instanceof TypeDeclaration) {
-                    return (TypeDeclaration) member;
-                }
-                else if (member instanceof TypedDeclaration) {
-                    return anonymousType(name, 
-                            (TypedDeclaration) member);
-                }
-            }
             return null;
         }
     }
@@ -142,42 +222,20 @@ public class AnalyzerUtil {
         Declaration result = 
                 scope.getMemberOrParameter(unit, 
                         name, signature, ellipsis);
+        if (result==null
+                && transformNameForJava(scope, name, false)) {
+            result = getFromJava(getJavaBeanName(name), 
+                    scope, signature, ellipsis, unit);
+        }
         
         if (result instanceof TypedDeclaration) {
             return (TypedDeclaration) result;
         }
         else {
-            if (isForBackend(scope.getScopedBackends(), Backend.Java) 
-                    && !JvmBackendUtil.isInitialLowerCase(name)) {
-                name = NamingBase.getJavaBeanName(name);
-                // This method is used for base members, not qualified members
-                // so we don't look for members but we look on the scope, which
-                // may contain values with the modified case. For example, given
-                // import Foo { ... } which contains a \iBAR we map to "bar",
-                // if we look on the scope for "bar" we may find one that is not
-                // the one we wanted to import, so try imports first.
-                result = unit.getImportedDeclaration(name, 
-                        signature, ellipsis);
-                if (result != null && !result.isJava()) {
-                    result = null;
-                }
-                else if (result instanceof TypedDeclaration) {
-                    return (TypedDeclaration) result;
-                }
-                result = 
-                        scope.getMemberOrParameter(unit, 
-                                name, signature, ellipsis);
-                if (result != null && !result.isJava()) {
-                    result = null;
-                }
-                else if (result instanceof TypedDeclaration) {
-                    return (TypedDeclaration) result;
-                }
-            }
             return null;
         }
     }
-    
+
     static TypeDeclaration getTypeDeclaration(Scope scope,
             String name, List<Type> signature, boolean ellipsis,
             Unit unit) {
@@ -185,6 +243,11 @@ public class AnalyzerUtil {
         Declaration result = 
                 scope.getMemberOrParameter(unit, 
                         name, signature, ellipsis);
+        if (result==null
+                && transformNameForJava(scope, name, true)) {
+            result = getFromJava(capitalize(name), 
+                    scope, signature, ellipsis, unit);
+        }
         
         if (result instanceof TypeDeclaration) {
             return (TypeDeclaration) result;
@@ -194,41 +257,6 @@ public class AnalyzerUtil {
                     (TypedDeclaration) result);
         }
         else {
-            if (isForBackend(scope.getScopedBackends(), Backend.Java) 
-                    && JvmBackendUtil.isInitialLowerCase(name)) {
-                name = NamingBase.capitalize(name);
-                // This method is used for base members, not qualified members
-                // so we don't look for members but we look on the scope, which
-                // may contain values with the modified case. For example, given
-                // import Foo { ... } which contains a \iBAR we map to "bar",
-                // if we look on the scope for "bar" we may find one that is not
-                // the one we wanted to import, so try imports first.
-                result = unit.getImportedDeclaration(name, 
-                        signature, ellipsis);
-                if (result != null && !result.isJava()) {
-                    result = null;
-                }
-                else if (result instanceof TypeDeclaration) {
-                    return (TypeDeclaration) result;
-                }
-                else if (result instanceof TypedDeclaration) {
-                    return anonymousType(name, 
-                            (TypedDeclaration) result);
-                }
-                result = 
-                        scope.getMemberOrParameter(unit, 
-                                name, signature, ellipsis);
-                if (result != null && !result.isJava()) {
-                    result = null;
-                }
-                else if (result instanceof TypeDeclaration) {
-                    return (TypeDeclaration) result;
-                }
-                else if (result instanceof TypedDeclaration) {
-                    return anonymousType(name, 
-                            (TypedDeclaration) result);
-                }
-            }
             return null;
         }
     }
@@ -737,7 +765,7 @@ public class AnalyzerUtil {
         }
         else if (type.isNothing()) {
             node.addError(message + 
-                    ": operand has type `Nothing`");
+                    ": operand has type 'Nothing'");
             return null;
         }
         else {
@@ -790,31 +818,47 @@ public class AnalyzerUtil {
         }
     }
 
-    static void checkAssignableToOneOf(Type type, 
-            Type supertype1, Type supertype2, 
-            Node node, String message, int code) {
+    static void checkAssignableIgnoringNull(Type type, 
+            Type supertype, Node node, Declaration dec,
+            String message, int code) {
         if (isTypeUnknown(type)) {
             addTypeUnknownError(node, type, message);
         }
-        else if (isTypeUnknown(supertype1)) {
-            addTypeUnknownError(node, supertype1, message);
+        else if (isTypeUnknown(supertype)) {
+            addTypeUnknownError(node, supertype, message);
         }
-        else if (isTypeUnknown(supertype2)) {
-            addTypeUnknownError(node, supertype2, message);
-        }
-        else if (!type.isSubtypeOf(supertype1)
-                && !type.isSubtypeOf(supertype2)) {
-            if (supertype1.isUnion() && supertype1.covers(type)) {
-                node.addUsageWarning(Warning.implicitNarrowing,
-                        message + 
-                        notAssignableMessage(type, supertype1, node));
+        else {
+            Unit unit = node.getUnit();
+            boolean ignoreNull = 
+                    canIgnoreNull(type, unit, dec);
+            Type checkType = 
+                    ignoreNull ?
+                        unit.getOptionalType(supertype) : 
+                        supertype;
+            if (!type.isSubtypeOf(checkType)) {
+                if (supertype.isUnion() 
+                        && supertype.covers(type)) {
+                    node.addUsageWarning(Warning.implicitNarrowing,
+                            message + 
+                            notAssignableMessage(type, supertype, node));
+                }
+                else {
+                    if (ignoreNull) {
+                        message += " ignoring 'null'";
+                    }
+                    node.addError(message + 
+                            notAssignableMessage(type, supertype, node), 
+                            code);
+                }
             }
-            else {
-                node.addError(message + 
-                        notAssignableMessage(type, supertype1, node), 
-                        code);
-            }
         }
+    }
+
+    private static boolean canIgnoreNull(
+            Type type, Unit unit, Declaration dec) {
+        return hasUncheckedNullType(dec) 
+            && unit.getNullValueType()
+                    .isSubtypeOf(type);
     }
 
     static String notAssignableMessage(Type type,
@@ -896,7 +940,8 @@ public class AnalyzerUtil {
             addTypeUnknownError(node, supertype, message);
         }
         else if (!type.isSubtypeOf(supertype)) {
-            if (supertype.isUnion() && supertype.covers(type)) {
+            if (supertype.isUnion() 
+                    && supertype.covers(type)) {
                 node.addUsageWarning(Warning.implicitNarrowing,
                         message + 
                         notAssignableMessage(type, supertype, node));
@@ -992,7 +1037,7 @@ public class AnalyzerUtil {
         else {
             String error = type.getFirstUnknownTypeError();
             if (error != null) {
-                return ": " + error;
+                return " - " + error;
             }
             else {
                 return "";
@@ -1154,10 +1199,25 @@ public class AnalyzerUtil {
     }
     
     static String message(Declaration dec) {
-        return "'" 
-                + dec.getName() 
-                + "'" 
-                + messageQualifier(dec);
+    	String name = dec.getName();
+		if (name==null) {
+    		if (isConstructor(dec)
+    				&& dec.isClassMember()) {
+    			Class c = (Class) dec.getContainer();
+    			return "default constructor of '" 
+    					+ c.getName() 
+    					+ "'";
+    		}
+    		else {
+    			return "";
+    		}
+    	}
+    	else {
+	        return "'" 
+	                + name 
+	                + "'" 
+	                + messageQualifier(dec);
+    	}
     }
     
     static String message(Declaration dec, 
@@ -1247,26 +1307,51 @@ public class AnalyzerUtil {
         return that;
     }
 
-    static void checkIsExactlyForInterop(Unit unit, 
+    static void checkIsExactlyIgnoringNull( 
             boolean isCeylon,  
             Type parameterType, 
             Type refinedParameterType, 
-            Node node, String message) {
+            Node node, String message,
+            int code) {
         if (isCeylon) {
             // it must be a Ceylon method
             checkIsExactly(parameterType, 
                     refinedParameterType, 
-                    node, message, 9200);
+                    node, message, code);
         }
         else {
             // we're refining a Java method
             Type refinedDefiniteType = 
-                    unit.getDefiniteType(
+                    node.getUnit()
+                        .getDefiniteType(
                             refinedParameterType);
             checkIsExactlyOneOf(parameterType, 
                     refinedParameterType, 
                     refinedDefiniteType, 
                     node, message);
+        }
+    }
+    
+    static void checkIsExactlyIgnoringNull( 
+            Declaration dec,  
+            Type parameterType, 
+            Type refinedParameterType, 
+            Node node, String message,
+            int code) {
+        if (hasUncheckedNullType(dec)) {
+            Type refinedOptionalType = 
+                    node.getUnit()
+                        .getOptionalType(
+                            refinedParameterType);
+            checkIsExactlyOneOf(parameterType, 
+                    refinedParameterType, 
+                    refinedOptionalType, 
+                    node, message);
+        }
+        else {
+            checkIsExactly(parameterType, 
+                    refinedParameterType, 
+                    node, message, code);
         }
     }
 
@@ -1409,8 +1494,9 @@ public class AnalyzerUtil {
                 Tree.SimpleType s = 
                         (Tree.SimpleType) t;
                 if (s.getTypeArgumentList()==null) {
-                    if (typeParam!=null || 
-                            isGeneric(s.getDeclarationModel())) {
+                    TypeDeclaration std = s.getDeclarationModel();
+                    if (std!=null && std.isParameterized() 
+                            || typeParam!=null) {
                         pt.setTypeConstructor(true);
                         pt.setTypeConstructorParameter(typeParam);
                     }
@@ -1420,34 +1506,33 @@ public class AnalyzerUtil {
         }
     }
 
-    static boolean isGeneric(Declaration member) {
-        if (member instanceof Generic) {
-            Generic g = (Generic) member;
-            return !g.getTypeParameters().isEmpty();
-        }
-        else {
-            return false;
-        }
-    }
-
-    static boolean inSameModule(TypeDeclaration etd, Unit unit) {
-        return etd.getUnit().getPackage().getModule()
-                .equals(unit.getPackage().getModule());
-    }
-
-    static void checkCasesDisjoint(Type type, Type other,
+    static boolean checkCasesDisjoint(Type later, Type earlier,
             Node node) {
-        if (!isTypeUnknown(type) && !isTypeUnknown(other)) {
+        if (!isTypeUnknown(later) && !isTypeUnknown(earlier)) {
             Unit unit = node.getUnit();
             Type it = 
-                    intersectionType(type.resolveAliases(), 
-                            other.resolveAliases(), unit);
+                    intersectionType(later.resolveAliases(), 
+                            earlier.resolveAliases(), unit);
             if (!it.isNothing()) {
-                node.addError("cases are not disjoint: '" + 
-                        type.asString(unit) + "' and '" + 
-                        other.asString(unit) + "'");
+                if (earlier.isExactly(later)) {
+                    node.addError("case is not disjoint: there is another case of type '" + 
+                            earlier.asString(unit) + "' (use 'else case')");
+                }
+                else if (earlier.isSubtypeOf(later)) {
+                    node.addError("case is not disjoint: '" + 
+                            later.asString(unit) + "' contains '" + 
+                            earlier.asString(unit) + "' (use 'else case')");
+                }
+                else {
+                    node.addError("case is not disjoint: '" + 
+                            later.asString(unit) + "' and '" + 
+                            earlier.asString(unit) + "' have intersection '" +
+                            it.asString(unit) + "' (use 'else case')");
+                }
+                return false;
             }
         }
+        return true;
     }
 
     static Parameter getMatchingParameter(ParameterList pl, 
@@ -1464,8 +1549,9 @@ public class AnalyzerUtil {
         else {
             String name = name(id);
             for (Parameter p: pl.getParameters()) {
-                if (p.getName()!=null &&
-                        p.getName().equals(name)) {
+                String paramName = p.getName();
+                if (paramName!=null &&
+                        paramName.equals(name)) {
                     return p;
                 }
             }
@@ -1483,9 +1569,9 @@ public class AnalyzerUtil {
                         .getFullType();
             if (t!=null) {
                 t = t.resolveAliases();
+                Unit unit = p.getDeclaration().getUnit();
                 if (!foundParameters.contains(p) &&
-                        p.getDeclaration().getUnit()
-                            .isIterableParameterType(t)) {
+                        unit.isIterableParameterType(t)) {
                     return p;
                 }
             }
@@ -1495,9 +1581,8 @@ public class AnalyzerUtil {
 
     static boolean involvesTypeParams(Declaration dec, 
             Type type) {
-        if (isGeneric(dec)) {
-            Generic g = (Generic) dec;
-            return type.involvesTypeParameters(g);
+        if (dec!=null && dec.isParameterized()) {
+            return type.involvesTypeParameters((Generic) dec);
         }
         else {
             return false;
@@ -1507,12 +1592,12 @@ public class AnalyzerUtil {
     static TypeDeclaration unwrapAliasedTypeConstructor(
             TypeDeclaration dec) {
         TypeDeclaration d = dec;
-        while (!isGeneric(d) && d.isAlias()) {
+        while (!d.isParameterized() && d.isAlias()) {
             Type et = d.getExtendedType();
             if (et==null) break;
             et = et.resolveAliases();
             d = et.getDeclaration();
-            if (et.isTypeConstructor() && isGeneric(d)) {
+            if (et.isTypeConstructor() && d.isParameterized()) {
                 return d;
             }
         }
@@ -1521,12 +1606,12 @@ public class AnalyzerUtil {
 
     static Type unwrapAliasedTypeConstructor(Type type) {
         TypeDeclaration d = type.getDeclaration();
-        while (!isGeneric(d) && d.isAlias()) {
+        while (!d.isParameterized() && d.isAlias()) {
             Type et = d.getExtendedType();
             if (et==null) break;
             d = et.getDeclaration();
             et = et.resolveAliases();
-            if (et.isTypeConstructor() && isGeneric(d)) {
+            if (et.isTypeConstructor() && d.isParameterized()) {
                 return et;
             }
         }
@@ -1549,9 +1634,14 @@ public class AnalyzerUtil {
                     return pkg;
                 }
                 if (!pkg.isShared()) {
-                    path.addError("imported package is not shared: '" + 
-                            nameToImport + "' is not annotated 'shared' in '" +
+                    path.addError("imported package is not visible: package '" + 
+                            nameToImport + "' is not shared by module '" +
                             pkgMod.getNameAsString() + "'", 402);
+                }
+                else if (!pkg.withinRestrictions(unit)) {
+                    path.addError("imported package is not visible: package '" + 
+                            nameToImport + "' is restricted by module '" +
+                            pkgMod.getNameAsString() + "'");
                 }
 //                if (module.isDefault() && 
 //                        !pkg.getModule().isDefault() &&
@@ -1568,8 +1658,7 @@ public class AnalyzerUtil {
                 for (ModuleImport mi: module.getImports()) {
                     if (findModuleInTransitiveImports(
                             mi.getModule(), 
-                            pkgMod, 
-                            visited)) {
+                            pkgMod, visited)) {
                         return pkg; 
                     }
                 }
@@ -1580,16 +1669,17 @@ public class AnalyzerUtil {
                         String name = 
                                 mi.getModule()
                                     .getNameAsString();
+                        Backends backends = 
+                                path.getUnit()
+                                    .getSupportedBackends();
                         if (!isForBackend(mi.getNativeBackends(), 
-                                          path.getUnit()
-                                              .getSupportedBackends()) &&
+                                          backends) &&
                                 (nameToImport.equals(name) ||
                                  nameToImport.startsWith(name + "."))) {
                             return null;
                         }
                         if (!isForBackend(Backend.Java.asSet(), 
-                                          path.getUnit()
-                                              .getSupportedBackends()) &&
+                                          backends) &&
                                 unit.isJdkPackage(nameToImport)) {
                             return null;
                         }
@@ -1606,7 +1696,8 @@ public class AnalyzerUtil {
         return null;
     }
     
-    static Module importedModule(Tree.ImportPath path) {
+    static Module importedModule(Tree.ImportPath path, 
+            boolean restriction) {
         if (path!=null && 
                 !path.getIdentifiers().isEmpty()) {
             String nameToImport = 
@@ -1634,15 +1725,17 @@ public class AnalyzerUtil {
                 //all modules in the same source dir
                 Set<Module> visited = new HashSet<Module>();
                 for (ModuleImport mi: module.getImports()) {
-                    Module m = mi.getModule();
-                    if (findModuleInTransitiveImports(m, mod, 
-                            visited)) {
+                    if (findModuleInTransitiveImports(
+                            mi.getModule(), 
+                            mod, visited)) {
                         return mod; 
                     }
                 }
             }
-            path.addError("module not found in imported modules: '" + 
-                    nameToImport + "'", 7000);
+            if (!restriction) {
+                path.addError("module not found in imported modules: '" + 
+                        nameToImport + "'", 7000);
+            }
         }
         return null;
     }
@@ -1677,17 +1770,16 @@ public class AnalyzerUtil {
                 unit.getPackage()
                     .getQualifiedNameString();
         String name = name(that.getIdentifier());
-        return Module.LANGUAGE_MODULE_NAME.equals(pname) &&
-                ("Anything".equalsIgnoreCase(name) ||
-                "Object".equalsIgnoreCase(name) ||
-                "Basic".equalsIgnoreCase(name) ||
-                "Null".equalsIgnoreCase(name));
+        return Module.LANGUAGE_MODULE_NAME.equals(pname) 
+            && ("Anything".equalsIgnoreCase(name) 
+             || "Object".equalsIgnoreCase(name) 
+             || "Basic".equalsIgnoreCase(name) 
+             || "Null".equalsIgnoreCase(name));
     }
 
-    static boolean hasUncheckedNullType(Reference member) {
-        Declaration dec = member.getDeclaration();
-        return dec instanceof TypedDeclaration && 
-                ((TypedDeclaration) dec)
+    static boolean hasUncheckedNullType(Declaration dec) {
+        return dec instanceof TypedDeclaration 
+            && ((TypedDeclaration) dec)
                     .hasUncheckedNullType();
     }
 
@@ -1699,7 +1791,8 @@ public class AnalyzerUtil {
             if (correction.getName().equals(name)) {
                 if (correction.isUnimported()) {
                     return " might be misspelled or is not imported (did you mean to import it from '" 
-                        + correction.packageName() + "'?)";
+                        + correction.packageName() 
+                        + "'?)";
                 }
                 else {
                     return "";
@@ -1708,12 +1801,15 @@ public class AnalyzerUtil {
             else {
                 if (correction.isUnimported()) {
                     return " might be misspelled or is not imported (did you mean '" 
-                        + correction.realName(unit) + "' from '" 
-                        + correction.packageName() + "'?)";
+                        + correction.realName(unit) 
+                        + "' from '" 
+                        + correction.packageName() 
+                        + "'?)";
                 }
                 else {
                     return " might be misspelled or is not imported (did you mean '" 
-                        + correction.realName(unit) + "'?)";
+                        + correction.realName(unit) 
+                        + "'?)";
                 }
             }
         }
@@ -1732,7 +1828,8 @@ public class AnalyzerUtil {
         }
         else {
             return " might be misspelled (did you mean '" 
-                + correction.realName(unit) + "'?)";
+                + correction.realName(unit) 
+                + "'?)";
         }
     }
 
@@ -1742,11 +1839,16 @@ public class AnalyzerUtil {
         DeclarationWithProximity correction =
                 correct(scope, name, cancellable);
         if (correction==null) {
-            return " might be misspelled or does not belong to this package";
+            return " might be misspelled or does not belong to the package '" 
+                    + scope.getNameAsString() 
+                    + "'";
         }
         else {
-            return " might be misspelled or does not belong to this package (did you mean '" 
-                + correction.realName(unit) + "'?)";
+            return " might be misspelled or does not belong to the package '" 
+                    + scope.getNameAsString() 
+                    + "' (did you mean '" 
+                    + correction.realName(unit) 
+                    + "'?)";
         }
     }
 

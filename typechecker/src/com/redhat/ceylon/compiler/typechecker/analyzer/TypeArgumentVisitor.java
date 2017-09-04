@@ -59,7 +59,7 @@ public class TypeArgumentVisitor extends Visitor {
     @Override public void visit(Tree.TypedDeclaration that) {
         TypedDeclaration dec = that.getDeclarationModel();
         if (!(that instanceof Tree.Variable)) {
-            check(that.getType(), dec.isVariable(), dec);
+            check(that.getType(), dec.isVariable() || dec.isLate(), dec);
         }
         if (dec.isParameter()) {
             flip();
@@ -253,38 +253,36 @@ public class TypeArgumentVisitor extends Visitor {
                 }
                 String typename = 
                         type.asString(that.getUnit());
-                that.addError(var + 
-                        " type parameter '" + tp.getName() + 
-                        "' of '" + declaration.getName() +
-                        "' appears in " + loc + 
-                        " location in type: '" + typename + 
-                        "'");
+                that.addError(var 
+                        + " type parameter '" + tp.getName() 
+                        + "' of '" + declaration.getName() 
+                        + "' occurs at a " + loc 
+                        + " location in type: '" + typename 
+                        + "'");
             }
         }
     }
 
     private boolean isConstructorClass(Declaration declaration) {
-        return constructorClass!=null &&
-            declaration.equals(constructorClass);
+        return constructorClass!=null 
+            && declaration.equals(constructorClass);
     }
     
     @Override
     public void visit(Tree.SimpleType that) {
         super.visit(that);
-        Tree.TypeArgumentList tal = 
-                that.getTypeArgumentList();
-        TypeDeclaration dec = that.getDeclarationModel();
-        Type type = that.getTypeModel();
-        if (dec!=null && type!=null) {
-            List<TypeParameter> params = 
-                    dec.getTypeParameters();
-            if (tal==null 
-                    && !params.isEmpty() 
+        if (that.getTypeArgumentList()==null) {
+            TypeDeclaration dec = that.getDeclarationModel();
+            Type type = that.getTypeModel();
+            if (dec!=null && type!=null 
+                    && dec.isParameterized() 
                     && !type.isTypeConstructor() 
                     && !that.getMetamodel() 
                     && !(that.getStaticTypePrimary() 
                             && dec.isJava())) {
                 String name = dec.getName(that.getUnit());
+                List<TypeParameter> params = 
+                        dec.getTypeParameters();
                 if (!params.get(0).isDefaulted()) {
                     StringBuilder paramList = 
                             new StringBuilder();
@@ -300,7 +298,6 @@ public class TypeArgumentVisitor extends Visitor {
                     that.addError("missing type arguments to generic type: '" + 
                             name + "' declares type parameters " + 
                             paramList);
-   
                 }
                 else {
                     that.addUsageWarning(Warning.syntaxDeprecation,

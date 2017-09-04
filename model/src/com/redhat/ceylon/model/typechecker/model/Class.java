@@ -15,6 +15,9 @@ public class Class extends ClassOrInterface implements Functional {
     private static final int TRUE_VALUE = 1<<21;
     private static final int NULL_VALUE = 1<<20;
     private static final int RANGE = 1<<12;
+    private static final int ARRAY = 1<<13;
+    private static final int THROWABLE = 1<<14;
+    private static final int EXCEPTION = 1<<15;
     private static final int ENTRY = 1<<11;
     private static final int TUPLE = 1<<10;
     private static final int BYTE = 1<<9;
@@ -65,20 +68,6 @@ public class Class extends ClassOrInterface implements Functional {
             }
         }
         return false;
-    }
-    
-    @Override
-    public boolean isValueConstructor() {
-        return (flags&VALUE_CONSTRUCTOR)!=0;
-    }
-    
-    public void setValueConstructor(boolean valueConstructor) {
-        if (valueConstructor) {
-            flags|=VALUE_CONSTRUCTOR;
-        }
-        else {
-            flags&=(~VALUE_CONSTRUCTOR);
-        }
     }
     
     @Override
@@ -153,8 +142,8 @@ public class Class extends ClassOrInterface implements Functional {
     public FunctionOrValue getDefaultConstructorFunctionOrValue() {
         if (hasConstructors()) {
             for (Declaration dec: getMembers()) {
-                if (dec instanceof FunctionOrValue &&
-                        dec.getName()==null) {
+                if (dec instanceof FunctionOrValue 
+                        && dec.getName()==null) {
                     return (FunctionOrValue) dec;
                 }
             }
@@ -170,8 +159,8 @@ public class Class extends ClassOrInterface implements Functional {
         if (parameterList==null) {
             Constructor defaultConstructor = 
                     getDefaultConstructor();
-            return defaultConstructor!=null &&
-                    defaultConstructor.isSealed();
+            return defaultConstructor!=null 
+                && defaultConstructor.isSealed();
         }
         else {
             return super.isSealed();
@@ -187,17 +176,8 @@ public class Class extends ClassOrInterface implements Functional {
         if (hasConstructors()) {
             Constructor defaultConstructor = 
                     getDefaultConstructor();
-            if (defaultConstructor==null) {
-                return null;
-            }
-            else {
-                if (defaultConstructor.getParameterLists().isEmpty()) {
-                    return null;
-                }
-                else {
-                    return defaultConstructor.getFirstParameterList();
-                }
-            }
+            return defaultConstructor==null ? null : 
+                defaultConstructor.getParameterList();
         }
         else {
             return parameterList;
@@ -228,7 +208,8 @@ public class Class extends ClassOrInterface implements Functional {
         for (Declaration d : getMembers()) {
             if (d.isParameter() && 
                     ModelUtil.isNamed(name, d)) {
-                FunctionOrValue fov = (FunctionOrValue) d;
+                FunctionOrValue fov = 
+                        (FunctionOrValue) d;
                 return fov.getInitializerParameter();
             }
         }
@@ -237,7 +218,7 @@ public class Class extends ClassOrInterface implements Functional {
     
     @Override
     public boolean isOverloaded() {
-    	return (flags&OVERLOADED)!=0;
+        return (flags&OVERLOADED)!=0;
     }
     
     public void setOverloaded(boolean overloaded) {
@@ -247,8 +228,7 @@ public class Class extends ClassOrInterface implements Functional {
         else {
             flags&=(~OVERLOADED);
         }
-
-	}
+    }
     
     @Override
     public Type getExtendedType() {
@@ -288,17 +268,18 @@ public class Class extends ClassOrInterface implements Functional {
     
     @Override
     public boolean isFinal() {
-		return (flags&FINAL)!=0||(flags&ANONYMOUS)!=0;
-	}
+        return (flags&FINAL)!=0
+            || (flags&ANONYMOUS)!=0;
+    }
     
     public void setFinal(boolean fin) {
-		if (fin) {
-		    flags|=FINAL;
-		}
-		else {
-		    flags&=(~FINAL);
-		}
-	}
+        if (fin) {
+            flags|=FINAL;
+        }
+        else {
+            flags&=(~FINAL);
+        }
+    }
 
     @Override
     public boolean isDeclaredVoid() {
@@ -347,6 +328,12 @@ public class Class extends ClassOrInterface implements Functional {
                             code = ENTRY; break;
                         case "Range":
                             code = RANGE; break;
+                        case "Array":
+                            code = ARRAY; break;
+                        case "Throwable":
+                            code = THROWABLE; break;
+                        case "Exception":
+                            code = EXCEPTION; break;
                         case "null":
                             code = NULL_VALUE; break;
                         case "true":
@@ -467,6 +454,24 @@ public class Class extends ClassOrInterface implements Functional {
     }
     
     @Override
+    public boolean isArray() {
+        setCode();
+        return code == ARRAY;
+    }
+
+    @Override
+    public boolean isThrowable() {
+        setCode();
+        return code == THROWABLE;
+    }
+
+    @Override
+    public boolean isException() {
+        setCode();
+        return code == EXCEPTION;
+    }
+
+    @Override
     public boolean inherits(TypeDeclaration dec) {
         if (dec==null) {
             return false;
@@ -475,13 +480,14 @@ public class Class extends ClassOrInterface implements Functional {
             return true;
         }
         else if (dec.isObject()) {
-            return !isAnything() && 
-                !isNull() && !isNullValue();
+            return !isAnything() 
+                && !isNull() && !isNullValue();
         }
         else if (dec.isNull()) {
             return isNull() || isNullValue();
         }
-        else if (dec instanceof Class && equals(dec)) {
+        else if (dec instanceof Class 
+                    && equals(dec)) {
             return true;
         }
         else if (dec.isFinal() &&
@@ -496,15 +502,17 @@ public class Class extends ClassOrInterface implements Functional {
             //TODO: optimize this to avoid walking the
             //      same supertypes multiple times
             Type et = getExtendedType();
-            if (et!=null && 
-                    et.getDeclaration().inherits(dec)) {
+            if (et!=null 
+                    && et.getDeclaration()
+                        .inherits(dec)) {
                 return true;
             }
             if (dec instanceof Interface) {
                 List<Type> sts = getSatisfiedTypes();
                 for (int i=0, s=sts.size(); i<s; i++) {
                     Type st = sts.get(i);
-                    if (st.getDeclaration().inherits(dec)) {
+                    if (st.getDeclaration()
+                            .inherits(dec)) {
                         return true;
                     }
                 }
@@ -535,19 +543,6 @@ public class Class extends ClassOrInterface implements Functional {
         }
     }
 
-    public boolean isJavaEnum() {
-        return (flags&JAVA_ENUM)!=0;
-    }
-
-    public void setJavaEnum(boolean javaEnum) {
-        if (javaEnum) {
-            flags|=JAVA_ENUM;
-        }
-        else {
-            flags&=(~JAVA_ENUM);
-        }
-    }
-    
     @Override
     public boolean isEmptyType() {
         return isEmptyValue();
@@ -567,7 +562,8 @@ public class Class extends ClassOrInterface implements Functional {
     public boolean isSequentialType() {
         if (sequentialType==0) {
             sequentialType = 
-                    isSequentialTypeInternal() ? 1 : -1;
+                    isSequentialTypeInternal() ? 
+                            1 : -1;
         }
         return sequentialType>0;
     }
@@ -576,13 +572,20 @@ public class Class extends ClassOrInterface implements Functional {
     public boolean isSequenceType() {
         if (sequenceType==0) {
             sequenceType = 
-                    isSequenceTypeInternal() ? 1 : -1;
+                    isSequenceTypeInternal() ? 
+                            1 : -1;
         }
         return sequenceType>0;
     }
 
+    private boolean inLanguagePackage() {
+        return getUnit()
+                .getPackage()
+                .isLanguagePackage();
+    }
+    
     private boolean isSequentialTypeInternal() {
-        if (!getUnit().getPackage().isLanguagePackage()) {
+        if (!inLanguagePackage()) {
             return false;
         }
         else if (isAnything() || isObject() || 
@@ -608,9 +611,9 @@ public class Class extends ClassOrInterface implements Functional {
             return false;
         }
     }
-    
+
     private boolean isSequenceTypeInternal() {
-        if (!getUnit().getPackage().isLanguagePackage()) {
+        if (!inLanguagePackage()) {
             return false;
         }
         else if (isAnything() || isObject() || 
@@ -652,14 +655,18 @@ public class Class extends ClassOrInterface implements Functional {
                     params.append(", ");
                 }
                 FunctionOrValue model = p.getModel();
-                if (model!=null && model.getType()!=null) {
+                if (model!=null 
+                        && model.getType()!=null) {
+                    Type type;
                     if (model.isFunctional()) {
-                        params.append(model.getTypedReference().getFullType().asString());
+                        type = model.getTypedReference()
+                                .getFullType();
                     }
                     else {
-                        params.append(model.getType().asString());
+                        type = model.getType();
                     }
-                    params.append(" ");
+                    params.append(type.asString())
+                          .append(" ");
                 }
                 params.append(p.getName());
             }

@@ -101,19 +101,6 @@ public class ClasspathToolTests extends AbstractToolTests {
     }
 
     @Test
-    public void testModuleNameAlone() throws Exception {
-        ToolModel<CeylonClasspathTool> model = pluginLoader.loadToolModel("classpath");
-        Assert.assertNotNull(model);
-        CeylonClasspathTool tool = pluginFactory.bindArguments(model, getMainTool(), 
-                toolOptions("net.minidev.json-smart"));
-        StringBuilder b = new StringBuilder();
-        tool.setOut(b);
-        tool.run();
-        String cp = b.toString();
-        Assert.assertTrue(cp.contains("ceylon.language-"+Versions.CEYLON_VERSION_NUMBER+".car"));
-    }
-
-    @Test
     public void testModuleNameWithBadVersion() throws Exception {
         ToolModel<CeylonClasspathTool> model = pluginLoader.loadToolModel("classpath");
         Assert.assertNotNull(model);
@@ -138,9 +125,9 @@ public class ClasspathToolTests extends AbstractToolTests {
         String cp = b.toString();
         Assert.assertTrue(cp.contains("ceylon.language-"+Versions.CEYLON_VERSION_NUMBER+".car"));
         Assert.assertFalse(cp.contains("minidev"));
-        Assert.assertFalse(cp.contains("maven"));
+//        Assert.assertFalse(cp.contains("maven"));
         Assert.assertFalse(cp.contains("aether"));
-        Assert.assertFalse(cp.contains("plexus"));
+//        Assert.assertFalse(cp.contains("plexus"));
     }
 
     @Test
@@ -157,8 +144,8 @@ public class ClasspathToolTests extends AbstractToolTests {
         String cp = b.toString();
         Assert.assertTrue(cp.contains("ceylon.language-"+Versions.CEYLON_VERSION_NUMBER+".car"));
         Assert.assertFalse(cp.contains("minidev"));
-        Assert.assertTrue(cp.contains("maven"));
+//        Assert.assertTrue(cp.contains("maven"));
         Assert.assertTrue(cp.contains("aether"));
-        Assert.assertTrue(cp.contains("plexus"));
+//        Assert.assertTrue(cp.contains("plexus"));
     }
 }

@@ -22,7 +22,7 @@
  An implementation of `Set` may compare elements for 
  equality using [[Object.equals]] or [[Comparable.compare]]."
 tagged("Collections")
-see (`function package.set`, `value emptySet`)
+see (function package.set, value emptySet)
 shared interface Set<out Element=Object>
         satisfies Collection<Element>
         given Element satisfies Object {
@@ -149,8 +149,7 @@ shared interface Set<out Element=Object>
      set if it is both a subset and a superset of the second
      set."
     shared actual default Boolean equals(Object that) {
-        if (is Set<> that,
-                that.size==size) {
+        if (is Set<> that, that.size==size) {
             for (element in this) {
                 if (!element in that) {
                     return false;
@@ -185,7 +184,7 @@ shared interface Set<out Element=Object>
  
  This is an eager operation and the resulting set does not 
  reflect changes to the given [[stream]]."
-see(`value Iterable.distinct`)
+see(value Iterable.distinct)
 since("1.2.0")
 shared Set<Element> set<Element>(
     "The stream of elements."

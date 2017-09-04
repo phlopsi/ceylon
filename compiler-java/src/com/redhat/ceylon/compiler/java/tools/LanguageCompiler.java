@@ -73,7 +73,6 @@ import com.redhat.ceylon.compiler.typechecker.parser.CeylonParser;
 import com.redhat.ceylon.compiler.typechecker.parser.LexError;
 import com.redhat.ceylon.compiler.typechecker.parser.ParseError;
 import com.redhat.ceylon.compiler.typechecker.parser.RecognitionError;
-import com.redhat.ceylon.compiler.typechecker.tree.Tree;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree.CompilationUnit;
 import com.redhat.ceylon.compiler.typechecker.util.ModuleManagerFactory;
 import com.redhat.ceylon.compiler.typechecker.util.NewlineFixingStringStream;
@@ -102,7 +101,6 @@ import com.redhat.ceylon.langtools.tools.javac.util.Abort;
 import com.redhat.ceylon.langtools.tools.javac.util.Context;
 import com.redhat.ceylon.langtools.tools.javac.util.Convert;
 import com.redhat.ceylon.langtools.tools.javac.util.List;
-import com.redhat.ceylon.langtools.tools.javac.util.Log;
 import com.redhat.ceylon.langtools.tools.javac.util.Log.WriterKind;
 import com.redhat.ceylon.langtools.tools.javac.util.Options;
 import com.redhat.ceylon.langtools.tools.javac.util.Pair;
@@ -215,7 +213,7 @@ public class LanguageCompiler extends JavaCompiler {
         Options options = Options.instance(context);
         options.put("-Xprefer", "source");
         // make sure it's registered
-        Log log = CeylonLog.instance(context);
+//        Log log = CeylonLog.instance(context);
         CeylonEnter.instance(context);
         CeylonClassWriter.instance(context);
         JavaCompiler instance = context.get(compilerKey);
@@ -409,6 +407,7 @@ public class LanguageCompiler extends JavaCompiler {
     }
     
     private static class RunTwiceException extends RuntimeException {
+        private static final long serialVersionUID = -3259389833053184306L;
 
         public RunTwiceException(String string) {
             super(string);
@@ -557,11 +556,11 @@ public class LanguageCompiler extends JavaCompiler {
             loadModuleFromSource(pkg, modules, moduleTrees, trees);
         }
         for(PhasedUnit phasedUnit : phasedUnits.getPhasedUnits()){
-            for(Tree.ModuleDescriptor modDescr : phasedUnit.getCompilationUnit().getModuleDescriptors()){
+            if(!phasedUnit.getCompilationUnit().getModuleDescriptors().isEmpty()){
                 String name = phasedUnit.getPackage().getNameAsString();
                 CeylonPhasedUnit cpu = (CeylonPhasedUnit) phasedUnit;
                 CeylonFileObject cfo = (CeylonFileObject) cpu.getFileObject();
-                moduleNamesToFileObjects .put(name, cfo);
+                moduleNamesToFileObjects.put(name, cfo);
             }
         }
         if(addModuleTrees){

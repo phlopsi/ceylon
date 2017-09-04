@@ -29,13 +29,14 @@ import ceylon.language {
  The functions [[ceylon.language::span]] and 
  [[ceylon.language::measure]], and corresponding operators 
  `..` and `:` are used to create new instances of `Range`."
-see (`function makeSpan`,
-    `function makeMeasure`)
+see (function makeSpan,
+    function makeMeasure)
 tagged("Sequences")
 shared sealed
 abstract serializable
 class Range<Element>()
-        of Span<Element> | Measure<Element>
+        of Span<Element> 
+         | Measure<Element>
         extends Object()
         satisfies [Element+]
         given Element satisfies Enumerable<Element> {

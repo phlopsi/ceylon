@@ -9,12 +9,12 @@
  - [[Sequence]]`<Element>`, abbreviated `[Element+]` 
    represents a non-empty sequence, and has the very 
    important subclass [[Tuple]]."
-see (`class Tuple`)
+see (class Tuple)
 tagged("Sequences")
 shared interface Sequential<out Element=Anything>
         of []|[Element+]
-        satisfies List<Element> & 
-                  Ranged<Integer,Element,Element[]> {
+        satisfies List<Element> 
+                & Ranged<Integer,Element,Element[]> {
     
     "The strictly-positive length of this sequence, that is, 
      the number of elements in this sequence."
@@ -25,10 +25,31 @@ shared interface Sequential<out Element=Anything>
     shared actual default Integer[] keys => 0:size;
     
     "This sequence."
-    shared actual default [Element+]|[] sequence() => this of [Element+]|[];
+    shared actual default [Element+]|[] sequence() 
+            => this of [Element+]|[];
     
     "The rest of the sequence, without the first element."
     shared actual formal Element[] rest;
+    
+    "This sequence, without the last element."
+    since("1.3.3")
+    shared actual formal Element[] exceptLast;
+    
+    "A subsequence of this sequence, starting at the element 
+     with index [[from]], ending at the element with the 
+     index [[to]]."
+    since("1.3.3")
+    shared actual formal Element[] sublist(Integer from, Integer to);
+    
+    "A subsequence of this sequence, ending at the element 
+     with the given [[index|to]]."
+    since("1.3.3")
+    shared actual formal Element[] sublistTo(Integer to);
+    
+    "A subsequence of this sequence, starting at the element 
+     with the given [[index|from]]."
+    since("1.3.3")
+    shared actual formal Element[] sublistFrom(Integer from);
     
     "A sequence containing the elements of this sequence in
      reverse order to the order in which they occur in this
@@ -106,9 +127,9 @@ shared interface Sequential<out Element=Anything>
     "Returns a new sequence that starts with the specified
      [[element]], followed by the elements of this sequence,
      in the order they occur in this sequence."
-    see (`function prepend`,
-         `function withTrailing`,
-         `function follow`)
+    see (function prepend,
+         function withTrailing,
+         function follow)
     since("1.1.0")
     shared formal 
     [Other,Element*] withLeading<Other>(
@@ -118,8 +139,8 @@ shared interface Sequential<out Element=Anything>
     "Returns a new sequence that starts with the elements of 
      this sequence, in the order they occur in this sequence, 
      and ends with the specified [[element]]."
-    see (`function append`,
-         `function withLeading`)
+    see (function append,
+         function withLeading)
     since("1.1.0")
     shared formal 
     [Element|Other+] withTrailing<Other>(
@@ -130,10 +151,10 @@ shared interface Sequential<out Element=Anything>
      sequence, in the order in which they occur in this 
      sequence, followed by the given [[elements]], in the 
      order in which they occur in the given sequence."
-    see (`function prepend`,
-         `function withTrailing`,
-         `function concatenate`,
-         `function chain`)
+    see (function prepend,
+         function withTrailing,
+         function concatenate,
+         function chain)
     since("1.1.0")
     shared formal 
     [Element|Other*] append<Other>(Other[] elements);
@@ -142,12 +163,26 @@ shared interface Sequential<out Element=Anything>
      the order in which they occur in the given sequence,
      followed by the elements of this sequence, in the order 
      in which they occur in this sequence."
-    see (`function append`,
-         `function withLeading`,
-         `function concatenate`)
+    see (function append,
+         function withLeading,
+         function concatenate)
     since("1.1.0")
     shared formal 
     [Element|Other*] prepend<Other>(Other[] elements);
+    
+    "A [[Tuple]] with the same elements as this sequence.
+     
+     This operation makes it possible to narrow this 
+     sequence to a given static length, for example:
+     
+         assert (is String[3] bits 
+                    = string.split('/'.equals)
+                            .sequence()
+                            .tuple);
+         value [prefix, middle, postfix] = bits;"
+    since("1.3.3")
+    shared formal
+    Element[] tuple();
     
     "A string of form `\"[ x, y, z ]\"` where `x`, `y`, and 
      `z` are the `string` representations of the elements of 

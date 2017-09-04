@@ -64,6 +64,10 @@ public abstract class TypeDescriptor
     
     public abstract boolean containsNull();
     
+    public abstract boolean isNull();
+    
+    public abstract boolean isObject();
+    
     public abstract boolean equals(Object other);
     
     public abstract int hashCode();
@@ -268,12 +272,12 @@ public abstract class TypeDescriptor
 
         @Override
         public boolean equals(Object obj) {
-            if(this == obj)
+            if (this == obj)
                 return true;
-            if(obj == null || obj instanceof Class == false)
+            if (obj == null || !(obj instanceof Class))
                 return false;
             Class other = (Class) obj;
-            if(klass != other.klass)
+            if (klass != other.klass)
                 return false;
             // now compare type arguments
             return super.equals(other);
@@ -288,7 +292,7 @@ public abstract class TypeDescriptor
             	memoizedHash = 37 * memoizedHash + Arrays.hashCode(useSiteVariance);
             	memoizedHash = 37 * memoizedHash + klass.hashCode();
             }
-            return  memoizedHash;
+            return memoizedHash;
         }
         
         @Override
@@ -329,11 +333,7 @@ public abstract class TypeDescriptor
          */
         @Override
         public java.lang.Class<?> getArrayElementClass() {
-            if (klass==Null.class ||
-                klass==ceylon.language.Object.class ||
-                klass==Anything.class ||
-                klass==Basic.class ||
-                klass==Identifiable.class) {
+            if (isNull() || isObject()) {
                 return java.lang.Object.class;
             }
             if (klass==ceylon.language.Throwable.class) {
@@ -378,16 +378,32 @@ public abstract class TypeDescriptor
 
         @Override
         public boolean containsNull() {
-            return klass==Null.class || klass == null_.class || klass==Anything.class;
+            return klass==Null.class 
+                || klass == null_.class 
+                || klass==Anything.class;
+        }
+
+        @Override
+        public boolean isNull() {
+            return klass==Null.class 
+                || klass == null_.class;
+        }
+
+        @Override
+        public boolean isObject() {
+            return klass==Anything.class
+                || klass==ceylon.language.Object.class
+                || klass==Identifiable.class
+                || klass==Basic.class;
         }
 
         public TypeDescriptor getSequenceElement() {
-            if(klass == ceylon.language.Tuple.class ||
-                    klass == Sequence.class ||
-                    klass == Sequential.class || 
-                    klass == ceylon.language.Range.class)
+            if (klass == ceylon.language.Tuple.class ||
+                klass == Sequence.class ||
+                klass == Sequential.class || 
+                klass == ceylon.language.Range.class)
                 return typeArguments[0];
-            if(klass == Empty.class)
+            if (klass == Empty.class)
                 return NothingType;
             return null;
         }
@@ -453,12 +469,12 @@ public abstract class TypeDescriptor
 
         @Override
         public boolean equals(Object obj) {
-            if(this == obj)
+            if (this == obj)
                 return true;
-            if(obj == null || obj instanceof Tuple == false)
+            if (obj == null || !(obj instanceof Tuple))
                 return false;
             Tuple other = (Tuple) obj;
-            if(klass != other.klass)
+            if (klass != other.klass)
                 return false;
             return Arrays.equals(elements, other.elements)
                     && variadic == other.variadic
@@ -665,17 +681,28 @@ public abstract class TypeDescriptor
         }
 
         @Override
+        public boolean isNull() {
+            throw new AssertionError("Should never be called");
+        }
+
+        @Override
+        public boolean isObject() {
+            throw new AssertionError("Should never be called");
+        }
+
+        @Override
         public boolean equals(Object obj) {
-            if(this == obj)
+            if (this == obj)
                 return true;
-            if(obj == null || obj instanceof FunctionOrValue == false)
+            if (obj == null || !(obj instanceof FunctionOrValue))
                 return false;
             FunctionOrValue other = (FunctionOrValue) obj;
-            if(name != null){
+            if (name != null){
                 if(!name.equals(other.name))
                     return false;
-            }else{
-                if(klass != other.klass)
+            }
+            else {
+                if (klass != other.klass)
                     return false;
             }
             // now compare type arguments
@@ -727,13 +754,13 @@ public abstract class TypeDescriptor
         
         @Override
         public boolean equals(Object obj) {
-            if(this == obj)
+            if (this == obj)
                 return true;
-            if(obj == null || obj instanceof Member == false)
+            if (obj == null || !(obj instanceof Member))
                 return false;
             Member other = (Member) obj;
             return container.equals(other.container)
-                    && member.equals(other.member);
+                && member.equals(other.member);
         }
 
         @Override
@@ -765,6 +792,16 @@ public abstract class TypeDescriptor
 
         @Override
         public boolean containsNull() {
+            return false;
+        }
+
+        @Override
+        public boolean isNull() {
+            return false;
+        }
+
+        @Override
+        public boolean isObject() {
             return false;
         }
     }
@@ -807,6 +844,16 @@ public abstract class TypeDescriptor
 
         @Override
         public boolean containsNull() {
+            return false;
+        }
+        
+        @Override
+        public boolean isNull() {
+            return false;
+        }
+        
+        @Override
+        public boolean isObject() {
             return false;
         }
     }
@@ -898,9 +945,9 @@ public abstract class TypeDescriptor
 
         @Override
         public boolean equals(Object obj) {
-            if(this == obj)
+            if (this == obj)
                 return true;
-            if(obj == null || obj instanceof Union == false)
+            if (obj == null || !(obj instanceof Union ))
                 return false;
             return super.equals((Union)obj);
         }
@@ -943,12 +990,23 @@ public abstract class TypeDescriptor
         public java.lang.Class<?> getArrayElementClass() {
             java.lang.Class<?> result = null;
             for (TypeDescriptor td: members) {
-                if (td instanceof Nothing || 
-                    td instanceof Class && td.containsNull()) {
+                if (td.isObject()) {
+                    return java.lang.Object.class;
+                }
+                if (td.isNull()) {
+                    continue;
+                }
+                if (td instanceof Nothing) {
                     continue;
                 }
                 java.lang.Class<?> c = td.getArrayElementClass();
                 if (result==null) {
+                    result = c;
+                }
+                else if (result.isAssignableFrom(c)) {
+                    //ignore it
+                }
+                else if (c.isAssignableFrom(result)) {
                     result = c;
                 }
                 else if (result!=c) {
@@ -963,6 +1021,22 @@ public abstract class TypeDescriptor
         public boolean containsNull() {
             for (TypeDescriptor td: members) {
                 if (td.containsNull()) return true;
+            }
+            return false;
+        }
+        
+        @Override
+        public boolean isNull() {
+            for (TypeDescriptor td: members) {
+                if (!td.isNull()) return false;
+            }
+            return true;
+        }
+        
+        @Override
+        public boolean isObject() {
+            for (TypeDescriptor td: members) {
+                if (td.isObject()) return true;
             }
             return false;
         }
@@ -989,9 +1063,9 @@ public abstract class TypeDescriptor
 
         @Override
         public boolean equals(Object obj) {
-            if(this == obj)
+            if (this == obj)
                 return true;
-            if(obj == null || obj instanceof Intersection == false)
+            if (obj == null || !(obj instanceof Intersection))
                 return false;
             return super.equals((Intersection)obj);
         }
@@ -1035,6 +1109,15 @@ public abstract class TypeDescriptor
         public java.lang.Class<?> getArrayElementClass() {
             java.lang.Class<?> result = null;
             for (TypeDescriptor td: members) {
+                if (td instanceof Nothing) {
+                    return java.lang.Object.class;
+                }
+                if (td.isNull()) {
+                    return java.lang.Object.class;
+                }
+                if (td.isObject()) {
+                    continue;
+                }
                 java.lang.Class<?> c = td.getArrayElementClass();
                 if (result==null) {
                     result = c;
@@ -1057,6 +1140,23 @@ public abstract class TypeDescriptor
         public boolean containsNull() {
             for (TypeDescriptor td: members) {
                 if (!td.containsNull()) return false;
+            }
+            return true;
+        }
+        
+        @Override
+        public boolean isNull() {
+            for (TypeDescriptor td: members) {
+                if (!td.isNull()) return false;
+            }
+            return true;
+        }
+        
+        @Override
+        public boolean isObject() {
+            //TODO: not sure about this!
+            for (TypeDescriptor td: members) {
+                if (!td.isObject()) return false;
             }
             return true;
         }

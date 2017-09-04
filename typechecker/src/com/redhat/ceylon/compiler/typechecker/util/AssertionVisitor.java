@@ -52,14 +52,20 @@ public class AssertionVisitor extends Visitor {
                     out(that, "missing asserted type");
                 }
                 else {
-                    String expectedType = sl.getText();
+                    String expectedType = 
+                            sl.getText()
+                              .replace(" ", "");
                     if (typedNode==null || type==null || 
                             type.getDeclaration()==null) {
                         out(that, "type not known");
                     }
                     else {
-                        String actualType = type.asString(false);
-                        String abbreviatedActualType = type.asString();
+                        String actualType = 
+                                type.asString(false)
+                                    .replace(" ", "");
+                        String abbreviatedActualType = 
+                                type.asString()
+                                    .replace(" ", "");
                         if (!actualType.equals(expectedType) &&
                                 !abbreviatedActualType.equals(expectedType)) {
                             String desc = "'" + abbreviatedActualType + "'";
@@ -90,6 +96,10 @@ public class AssertionVisitor extends Visitor {
             }
         }
         if (that instanceof Tree.ForIterator) {
+            super.visit(that);
+            return;
+        }
+        if (that instanceof Tree.Destructure) {
             super.visit(that);
             return;
         }
@@ -176,11 +186,11 @@ public class AssertionVisitor extends Visitor {
         StringBuffer buf = new StringBuffer();
         if (level != null) {
             if (level.contains("error")) {
-                buf.append(
-                        OSUtil.color(level, OSUtil.Color.red));
+                String red = OSUtil.color(level, OSUtil.Color.red);
+                buf.append(red);
             } else if (level.contains("warning")) {
-                buf.append(
-                        OSUtil.color(level, OSUtil.Color.yellow));
+                String yellow = OSUtil.color(level, OSUtil.Color.yellow);
+                buf.append(yellow);
             } else {
                 buf.append(level);
             }
@@ -196,7 +206,8 @@ public class AssertionVisitor extends Visitor {
         }
         if (of != null) {
             buf.append(" of ");
-            buf.append(OSUtil.color(of, OSUtil.Color.blue));
+            String blue = OSUtil.color(of, OSUtil.Color.blue);
+            buf.append(blue);
         }
         ps.println(buf.toString());
     }

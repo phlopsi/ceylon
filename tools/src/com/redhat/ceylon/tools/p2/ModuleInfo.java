@@ -23,7 +23,6 @@ package com.redhat.ceylon.tools.p2;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.SortedMap;
@@ -190,9 +189,6 @@ class ModuleInfo {
                     String[] details = split(pkg, ";");
                     String name = details[0];
                     boolean optional = false;
-                    // skip some modules
-                    if(tool.skipModule(name))
-                        continue;
                     String version = "";// GRRR: API of ModuleInfo
                     for(int i=1;i<details.length;i++){
                         if(details[i].startsWith("bundle-version=")){
@@ -205,6 +201,9 @@ class ModuleInfo {
                             }
                         }
                     }
+                    // skip some modules
+                    if(tool.skipModule(name, version))
+                        continue;
                     ret.add(new Dependency(name, version, optional));
                 }
             }

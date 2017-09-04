@@ -20,23 +20,18 @@
 
 package com.redhat.ceylon.compiler.java.loader.model;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import com.redhat.ceylon.cmr.api.ModuleDependencyInfo;
-import com.redhat.ceylon.cmr.api.ModuleInfo;
 import com.redhat.ceylon.cmr.api.Overrides;
 import com.redhat.ceylon.cmr.api.RepositoryManager;
 import com.redhat.ceylon.cmr.api.VersionComparator;
 import com.redhat.ceylon.cmr.ceylon.loader.ModuleNotFoundException;
 import com.redhat.ceylon.common.Backend;
-import com.redhat.ceylon.common.Backends;
 import com.redhat.ceylon.common.ModuleUtil;
 import com.redhat.ceylon.common.StatusPrinter;
 import com.redhat.ceylon.common.Versions;
@@ -128,6 +123,8 @@ public class LazyModuleSourceMapper extends ModuleSourceMapper {
                     module.setGroupId(artifact.groupId());
                 if(artifact.artifactId() != null)
                     module.setArtifactId(artifact.artifactId());
+                if(artifact.classifier() != null)
+                    module.setClassifier(artifact.classifier());
 
                 if(!modelLoader.loadCompiledModule(module)){
                     setupJavaModule(moduleImport, lazyModule, modelLoader, moduleManager, artifact);
@@ -145,27 +142,7 @@ public class LazyModuleSourceMapper extends ModuleSourceMapper {
             ArtifactResult artifact, LinkedList<Module> dependencyTree) {
         // it must be a Ceylon module
         // default modules don't have any module descriptors so we can't check them
-        Overrides overrides = getContext().getRepositoryManager().getOverrides();
-        if (overrides != null) {
-            Set<ModuleDependencyInfo> existingModuleDependencies = new HashSet<>();
-            for (ModuleImport i : module.getImports()) {
-                Module m = i.getModule();
-                if (m != null) {
-                    existingModuleDependencies.add(new ModuleDependencyInfo(i.getNamespace(), m.getNameAsString(), m.getVersion(), i.isOptional(), i.isExport(), i.getNativeBackends()));
-                }
-            }
-            ModuleInfo sourceModuleInfo = new ModuleInfo(artifact.name(), artifact.version(), 
-                    artifact.groupId(), artifact.artifactId(), null, existingModuleDependencies);
-            ModuleInfo newModuleInfo = overrides.applyOverrides(artifact.name(), artifact.version(), sourceModuleInfo);
-            List<ModuleImport> newModuleImports = new ArrayList<>();
-            for (ModuleDependencyInfo dep : newModuleInfo.getDependencies()) {
-                Module dependency = moduleManager.getOrCreateModule(ModuleManager.splitModuleName(dep.getName()), dep.getVersion());
-                Backends backends = dependency.getNativeBackends();
-                ModuleImport newImport = new ModuleImport(dep.getNamespace(), dependency, dep.isOptional(), dep.isExport(), backends);
-                newModuleImports.add(newImport);
-            }
-            module.overrideImports(newModuleImports);
-        }
+        overrideModuleImports(module, artifact);
         if(!Versions.isJvmBinaryVersionSupported(module.getJvmMajor(), module.getJvmMinor())){
             attachErrorToDependencyDeclaration(moduleImport,
                     dependencyTree,
@@ -207,7 +184,7 @@ public class LazyModuleSourceMapper extends ModuleSourceMapper {
                 moduleImport = new ModuleImport(dep.namespace(), dependency, 
                         dep.optional(), 
                         // allow forcing export but not for optional modules
-                        dep.exported() || (forceExport && !dep.optional()),
+                        dep.exported() || forceExport && !dep.optional(),
                         Backend.Java);
                 module.addImport(moduleImport);
             }
@@ -268,7 +245,7 @@ public class LazyModuleSourceMapper extends ModuleSourceMapper {
         if(jdkProvider != null && jdkProvider.isJDKModule(name)){
             error = "imported module '" + name + "' depends on JDK version '\"" + 
                     moduleImport.getModule().getVersion() +
-                    "\"' and you're compiling with Java " + jdkProvider.getJDKVersion();
+                    "\"' and compiler is using Java " + jdkProvider.getJDKVersion();
         }
         super.attachErrorToDependencyDeclaration(moduleImport, dependencyTree, error, isError);
     }
@@ -329,7 +306,10 @@ public class LazyModuleSourceMapper extends ModuleSourceMapper {
                         || !compiledModules.contains(imp.getModule())){
                     if(anyImport == null)
                         anyImport = imp;
-                    modules.put(imp.getModule().getNameAsString(), imp.getModule().getVersion());
+                    String name = imp.getModule().getNameAsString();
+                    if(imp.getNamespace() != null)
+                        name = imp.getNamespace() + ":" + name;
+                    modules.put(name, imp.getModule().getVersion());
                 }
             }
         }

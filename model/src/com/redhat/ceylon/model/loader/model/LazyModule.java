@@ -70,7 +70,8 @@ public abstract class LazyModule extends Module {
         JdkProvider jdkProvider = modelLoader.getJdkProvider();
         // The JDK uses arrays, which we pretend are in java.lang, and ByteArray needs ceylon.language.Byte,
         // so we pretend the JDK imports the language module
-        if(jdkProvider.isJDKModule(getNameAsString())){
+        if(jdkProvider!=null 
+                && jdkProvider.isJDKModule(getNameAsString())){
             Module languageModule = getModelLoader().getLanguageModule();
             if(languageModule instanceof LazyModule){
                 pkg = findPackageInModule((LazyModule) languageModule, name);
@@ -205,7 +206,8 @@ public abstract class LazyModule extends Module {
             if(isJdkPackage(getNameAsString(), pkgName))
                 return true;
             JdkProvider jdkProvider = getModelLoader().getJdkProvider();
-            if(jdkProvider.getJdkContainerModule() == this
+            if(jdkProvider!=null 
+                    && jdkProvider.getJdkContainerModule() == this
                     && jdkProvider.isJDKPackage(pkgName)){
                 return false;
             }
@@ -216,12 +218,14 @@ public abstract class LazyModule extends Module {
     
     @Override
     protected boolean isJdkModule(String moduleName) {
-        return getModelLoader().getJdkProvider().isJDKModule(moduleName);
+        JdkProvider jdkProvider = getModelLoader().getJdkProvider();
+        return jdkProvider!=null && jdkProvider.isJDKModule(moduleName);
     }
     
     @Override
     protected boolean isJdkPackage(String moduleName, String packageName) {
-        return getModelLoader().getJdkProvider().isJDKPackage(moduleName, packageName);
+        JdkProvider jdkProvider = getModelLoader().getJdkProvider();
+        return jdkProvider!=null && jdkProvider.isJDKPackage(moduleName, packageName);
     }
 
     public void addPackage(Package pkg){

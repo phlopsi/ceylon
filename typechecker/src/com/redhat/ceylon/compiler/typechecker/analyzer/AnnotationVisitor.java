@@ -56,16 +56,16 @@ public class AnnotationVisitor extends Visitor {
             }
             TypeDeclaration ptd = pt.getDeclaration();
             Unit unit = ptd.getUnit();
-            if (!ptd.isAnnotation() && !isEnum(ptd) &&
-                    !pt.isBoolean() &&
-                    !pt.isString() &&
-                    !pt.isInteger() &&
-                    !pt.isFloat() &&
-                    !pt.isCharacter() &&
-                    !pt.isIterable() &&
-                    !pt.isSequential() &&
-                    !pt.isSequence() &&
-                    !pt.isSubtypeOf(unit.getType(unit.getDeclarationDeclaration()))) {
+            if (!ptd.isAnnotation() && !isEnum(ptd) 
+                    && !pt.isBoolean() 
+                    && !pt.isString() 
+                    && !pt.isInteger() 
+                    && !pt.isFloat() 
+                    && !pt.isCharacter() 
+                    && !pt.isIterable() 
+                    && !pt.isSequential() 
+                    && !pt.isSequence() 
+                    && !pt.isSubtypeOf(unit.getType(unit.getDeclarationDeclaration()))) {
                 return true;
             }
             if (pt.isIterable() || pt.isSequential() || pt.isSequence()) {
@@ -1113,9 +1113,16 @@ public class AnnotationVisitor extends Visitor {
                         }
                     }
                     if (!ok) {
+                        StringBuilder message = new StringBuilder();
+                        for (AnnotationTarget at: target) {
+                            if (message.length()>0) {
+                                message.append(", ");
+                            }
+                            message.append(at);
+                        }
                         annotation.addError(
-                                "annotated program element does not satisfy annotation constraint: '"
-                                + target + "'");
+                                "annotated program element does not satisfy annotation constraint: the annotation is declared 'target {"
+                                + message + "}'");
                     }
                 }
             }
@@ -1158,11 +1165,11 @@ public class AnnotationVisitor extends Visitor {
     @Override public void visit(Tree.MemberOrTypeExpression that) {
         super.visit(that);
         Declaration dec = that.getDeclaration();
-        if (!that.getStaticMethodReferencePrimary() &&
-                isAbstraction(dec)) {
+        if (!that.getStaticMethodReferencePrimary() 
+                && isAbstraction(dec)) {
             Unit unit = that.getUnit();
-            if (that.getStaticMethodReference() && 
-                    !dec.isStatic()) {
+            if (that.getStaticMethodReference() 
+                    && !dec.isStatic()) {
                 that.addError("ambiguous static reference to overloaded method or class: '" +
                         dec.getName(unit) + "' is overloaded");
             }

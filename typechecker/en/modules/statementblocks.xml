@@ -619,7 +619,7 @@ Integer f(Integer n) => n+package.n;</programlisting>
                 <listitem>
                     <para>a toplevel declaration, as specified in 
                     <xref linkend="topleveldeclarations"/>, or a declaration that occurs in a 
-                    class declaration sectiony, as specified in <xref linkend="declarationsection"/>, 
+                    class declaration section, as specified in <xref linkend="declarationsection"/>, 
                     or interface body, as specified in <xref linkend="interfacebodies"/>.</para>
                 </listitem>
             </itemizedlist> 
@@ -670,7 +670,22 @@ Integer f(Integer n) => n+package.n;</programlisting>
     Float x => y;
     Float y => x;
 }</programlisting>
-    
+
+            <para>If a declaration is annotation <literal>restricted</literal>, and a
+            program element does not occur in either:</para>
+            
+            <itemizedlist>
+                <listitem>
+                    <para>the same package as the declaration, or</para>
+                </listitem>
+                <listitem>
+                    <para>one of the modules specified as arguments to the
+                    <literal>restricted</literal> annotation of the declaration,</para>
+                </listitem>
+            </itemizedlist>
+            
+            <para>then the declaration is not referenceable at the program element.</para>
+            
         </section>
         
         <section id="typeinferenceandblockstructure">
@@ -852,8 +867,8 @@ Integer f(Integer n) => n+package.n;</programlisting>
             
             <itemizedlist>
                 <listitem>
-                    <para>For a type declaration, the qualifying type is the full
-                    qualified type the qualifies the type name.</para>
+                    <para>For a type declaration, the qualifying type is the fully
+                    qualified type that qualifies the type name.</para>
                 </listitem>
                 <listitem>
                     <para>For a value reference or callable reference, the 
@@ -864,8 +879,8 @@ Integer f(Integer n) => n+package.n;</programlisting>
                     type of the qualifying base or member expression.</para>
                 </listitem>
                 <listitem>
-                    <para>For a static reference, the qualifying type is the full 
-                    qualified type the qualifies the type or member name.</para>
+                    <para>For a static reference, the qualifying type is the fully 
+                    qualified type that qualifies the type or member name.</para>
                 </listitem>
             </itemizedlist>
                     
@@ -1388,13 +1403,13 @@ else {
             <itemizedlist>
                 <listitem>
                     <para>an unqualified value reference, or a qualified value reference 
-                    where the receiver expression is `this`, and a lazy 
+                    where the receiver expression is <literal>this</literal>, and a lazy 
                     <literal>=&gt;</literal> specifier, or</para>
                 </listitem>
                 <listitem>
                     <para>a unqualified callable reference, or a qualified value reference 
-                    where the receiver expression is `this`, one or more parameter lists, 
-                    and a lazy specifier.</para>
+                    where the receiver expression is <literal>this</literal>, one or more 
+                    parameter lists, and a lazy specifier.</para>
                 </listitem>
             </itemizedlist>
             
@@ -1434,19 +1449,6 @@ if (normalize) {
 else {
     process(String s) => s;
 }</programlisting>
-            
-        </section>
-        
-        <section id="destructuringstatements">
-            <title>Destructuring statements</title>
-            
-            <para>A <emphasis>destructuring statement</emphasis> assigns an expression 
-            to a pattern, as defined above in <xref linkend="patterns"/>.</para>
-            
-            <synopsis>Destructure: "value" (TuplePattern | EntryPattern) Specifier ";"</synopsis>
-            
-            <para>The type of the specified expression is the patterned type of the
-            tuple or entry pattern.</para>
             
         </section>
         
@@ -1854,7 +1856,7 @@ else {
             </listitem-->
         </itemizedlist>
         
-        <synopsis>Condition: BooleanCondition | IsCondition | ExistsOrNonemptyCondition</synopsis>
+        <synopsis>Condition: BooleanCondition | IsCondition | ExistsCondition | NonemptyCondition</synopsis>
         
         <comment><para>TODO: are we going to support <literal>satisfies</literal> conditions on 
         type parameters, for example, <literal>if (Element satisfies Object)</literal>, to allow
@@ -1905,53 +1907,34 @@ else {
             <literal>val = expression is Type</literal>, which looks like an assignment
             of a boolean value.</para></comment>
             
-            <comment><para>TODO: are we going to allow <literal>is Type this</literal> and 
-            <literal>is Type outer</literal> to narrow the type of a self reference?</para></comment>
-            
-            <para>The type of the value reference or expression in an assignability condition 
-            must be:</para>
-            
-            <itemizedlist>
-                <listitem>
-                    <para>in the case of a condition which is not negated, a type which is not 
-                    a subtype of the specified type, but whose intersection with the specified 
-                    type is not exactly <literal>Nothing</literal>, except</para>
-                </listitem>
-                <listitem>
-                    <para>in the case of a negated condition, a type whose intersection with the 
-                    specified type is not exactly <literal>Nothing</literal>, and which is not a 
-                    supertype of the specified type, or</para>
-                </listitem>
-            </itemizedlist>
-            
-            <comment><para>Note: an assignability condition may narrow to an intersection or union 
-            type.</para>
+            <!--comment><para>Note: an assignability condition may narrow to an intersection 
+            or union type.</para>
             <programlisting>if (is Printable&amp;Identifiable obj) { ... }</programlisting>
-            <programlisting>if (is Integer|Float num) { ... }</programlisting></comment>
+            <programlisting>if (is Integer|Float num) { ... }</programlisting></comment-->
     
-            <para>For an assignability condition with a conditional expression of type 
-            <literal>T</literal> and specified type <literal>X</literal>:</para>
+            <para>For an assignability condition containing a value reference, and with a 
+            conditional expression of type <literal>T</literal> and specified type 
+            <literal>X</literal>:</para>
             
             <itemizedlist>
                 <listitem>
-                    <para>if the condition contains a value reference, the value will be treated 
-                    by the compiler as having type <literal>T&amp;X</literal> inside the block or 
-                    expression that immediately follows the condition, and, if this is the only 
-                    condition in the condition list, as having type <literal>T~X</literal> inside 
-                    the following <literal>else</literal> block or expression if any, unless</para>
+                    <para>the value will be treated by the compiler as having type 
+                    <literal>T&amp;X</literal> inside the block or expression that immediately 
+                    follows the condition, and, if this is the only condition in the condition 
+                    list, as having type <literal>T~X</literal> inside the following 
+                    <literal>else</literal> block or expression if any, unless</para>
                 </listitem>
                 <listitem>
-                    <para>it is a <literal>!is</literal> negated assignability condition, in which 
-                    case the value will be treated by the compiler as having type <literal>T~X</literal> 
-                    inside the block or expression that immediately follows the condition, and, if 
-                    this is the only condition in the condition list, as having type 
-                    <literal>T&amp;X</literal> inside the following <literal>else</literal> block 
-                    or expression if any.</para>
+                    <para>this condition is negated, in which case the value will be treated 
+                    by the compiler as having type <literal>T~X</literal> inside the block or 
+                    expression that immediately follows the condition, and, if this is the only 
+                    condition in the condition list, as having type <literal>T&amp;X</literal> 
+                    inside the following <literal>else</literal> block or expression if any.</para>
                 </listitem>
             </itemizedlist>
             
-            <para>Where, for any given types <literal>T</literal> and <literal>X</literal>, the type
-            <literal>T~X</literal> is determined as follows:</para>
+            <para>Where, for any given types <literal>T</literal> and <literal>X</literal>, 
+            the type <literal>T~X</literal> is determined as follows:</para>
             
             <itemizedlist>
                 <listitem>
@@ -1960,24 +1943,25 @@ else {
                     <literal>Nothing</literal>,</para>
                 </listitem>
                 <listitem>
-                    <para>if <literal>T</literal> is an intersection type, then <literal>T~X</literal> 
-                    is the intersection of all <literal>U~X</literal> for every type <literal>U</literal> 
-                    in the intersection,</para>
+                    <para>if <literal>T</literal> is an intersection type, then 
+                    <literal>T~X</literal> is the intersection of all <literal>U~X</literal> 
+                    for every type <literal>U</literal> in the intersection,</para>
                 </listitem>
                 <listitem>
-                    <para>if <literal>T</literal> is a union type, then <literal>T~X</literal> is 
-                    the union of all <literal>U~X</literal> for every type <literal>U</literal> in 
-                    the union,</para>
+                    <para>if <literal>T</literal> is a union type, then <literal>T~X</literal> 
+                    is the union of all <literal>U~X</literal> for every type <literal>U</literal> 
+                    in the union,</para>
                 </listitem>
                 <listitem>
                     <para>if <literal>T</literal> is a type parameter, then <literal>T~X</literal> 
                     is <literal>T&amp;&lt;U~X&gt;</literal> when <literal>U</literal> is the 
-                    intersection of all upper bounds on <literal>T</literal>, or <literal>Anything</literal> 
-                    if <literal>T</literal> has no declared upper bounds,</para>
+                    intersection of all upper bounds on <literal>T</literal>, or 
+                    <literal>Anything</literal> if <literal>T</literal> has no declared upper 
+                    bounds,</para>
                 </listitem>
                 <listitem>
-                    <para>if <literal>T</literal> is an enumerated type or an instantiation of a 
-                    generic enumerated type, then <literal>T~X</literal> is the union of all 
+                    <para>if <literal>T</literal> is an enumerated type or an instantiation of 
+                    a generic enumerated type, then <literal>T~X</literal> is the union of all 
                     <literal>C~X</literal> for every case <literal>C</literal> of 
                     <literal>T</literal>, or,</para>
                 </listitem>
@@ -1985,6 +1969,9 @@ else {
                     <para>otherwise, <literal>T~X</literal> is <literal>T</literal>.</para>
                 </listitem>
             </itemizedlist>
+            
+            <comment><para>Note: the compiler produces a warning if either <literal>T&amp;X</literal>
+	        or <literal>T~X</literal> is <literal>Nothing</literal>.</para></comment>
             
             <para>If you prefer, you can think of the following:</para>
             
@@ -2000,28 +1987,27 @@ if (is Usable tx) { ... }</programlisting>
             
             <para>As a special exception to the above, if a condition occurs in a 
             <literal>dynamic</literal> block, and the conditional expression has no type, 
-            and the condition contains a value reference, 
-            then:</para>
+            and the condition contains a value reference, then:</para>
             
             <itemizedlist>
                 <listitem>
-                    <para>if the condition is not negated, the value will be treated by the 
-                    compiler as having type <literal>X</literal> where <literal>X</literal> 
-                    is the specified type, inside the block or expression that immediately 
-                    follows the condition, or, otherwise</para>
+                    <para>the value will be treated by the compiler as having type 
+                    <literal>X</literal> where <literal>X</literal> is the specified type, 
+                    inside the block or expression that immediately follows the condition, 
+                    unless</para>
                 </listitem>
                 <listitem>
-                    <para>if the condition is negated, the value will be treated by the compiler 
-                    as having no type.</para>
+                    <para> the condition is negated, in which case the value will be treated 
+                    by the compiler as having no type.</para>
                 </listitem>
             </itemizedlist>
             
         </section>
         
-        <section id="existencenonemptinessconditions">
-            <title>Existence and nonemptiness conditions</title>
+        <section id="existsconditions">
+            <title>Existence conditions</title>
             
-            <para>An existence or nonemptiness condition may contain either:</para>
+            <para>An existence condition may contain either:</para>
             
             <itemizedlist>
                 <listitem>
@@ -2033,47 +2019,21 @@ if (is Usable tx) { ... }</programlisting>
                 </listitem>
             </itemizedlist>
                     
-            <synopsis>ExistsOrNonemptyCondition: "!"? ("exists" | "nonempty") (Pattern Specifier | MemberName)</synopsis>
+            <synopsis>ExistsCondition: "!"? "exists" (Pattern Specifier | MemberName)</synopsis>
             
             <para>A <emphasis>negated</emphasis> condition is one which starts with 
             <literal>!</literal>.</para>
             
-            <para>The type of the value reference or expression must be:</para>
+            <para>Every existence condition is equivalent to&mdash;and may be considered an 
+            abbreviation of&mdash;an assignability condition:</para>
             
             <itemizedlist>
                 <listitem>
-                    <para>in the case of an existence condition or negated existence condition, 
-                    a type whose intersection with <literal>Null</literal> is not exactly 
-                    <literal>Nothing</literal> and whose intersection with <literal>Object</literal> 
-                    is not exactly <literal>Nothing</literal>, or</para>
+                    <para><literal>exists x</literal> is equivalent to <literal>!is Null x</literal> 
+                    (and to <literal>is Object x</literal>), and</para>
                 </listitem>
                 <listitem>
-                    <para>in the case of a nonemptiness condition or a negated nonemptiness 
-                    condition, a subtype of <literal>Anything[]?</literal> whose intersection with 
-                    <literal>[]</literal> is not exactly <literal>Nothing</literal>, and whose 
-                    intersection with <literal>[Nothing+]</literal> is not exactly 
-                    <literal>Nothing</literal>.</para>
-                </listitem>
-            </itemizedlist>
-            
-            <para>Every existence or nonemptiness condition is equivalent to&mdash;and may be 
-            considered an abbreviation of&mdash;an assignability condition:</para>
-            
-            <itemizedlist>
-                <listitem>
-                    <para><literal>exists x</literal> is equivalent to <literal>is Object x</literal>, 
-                    and</para>
-                </listitem>
-                <listitem>
-                    <para><literal>!exists x</literal> is equivalent to <literal>is Null x</literal>,</para>
-                </listitem>
-                <listitem>
-                    <para><literal>nonempty x</literal> is equivalent to <literal>is [E+] x</literal>
-                    where <literal>x</literal> is an expression whose type has the principal 
-                    instantiation <literal>E[]?</literal>, and</para>
-                </listitem>
-                <listitem>
-                    <para><literal>!nonempty x</literal> is equivalent to <literal>is [] x</literal>.</para>
+                    <para><literal>!exists x</literal> is equivalent to <literal>is Null x</literal>.</para>
                 </listitem>
             </itemizedlist>
             
@@ -2116,48 +2076,8 @@ if (is Usable tx) { ... }</programlisting>
                 </listitem>
             </itemizedlist>
             
-            <para>For a nonemptiness condition which is not negated:</para>
-            
-            <itemizedlist>
-                <listitem>
-                    <para>if the condition has a pattern, the patterned type is
-                    <literal>T&amp;[E+]</literal>, where the specifier expression is of type 
-                    <literal>T</literal> and <literal>T</literal> has the principal instantiation 
-                    <literal>E[]?</literal>, and, if the pattern is a pattern variable, the declared 
-                    type of the variable, if any, must be a subtype of <literal>[Anything+]</literal>, 
-                    or</para>
-                </listitem>
-                <listitem>
-                    <para>if the condition contains a value reference, the value will be treated 
-                    by the compiler as having type <literal>T&amp;[E+]</literal> inside the block 
-                    or expression that immediately follows the condition, where the conditional 
-                    expression is of type <literal>T</literal> and <literal>T</literal> has the 
-                    principal instantiation <literal>E[]?</literal>, and, if this is the only 
-                    condition in the condition list, as having the type <literal>T&amp;[]</literal> 
-                    inside the following <literal>else</literal> block or expression if any.</para>
-                </listitem>
-            </itemizedlist>
-            
-            <para>For a negated nonemptiness condition:</para>
-            
-            <itemizedlist>
-                <listitem>
-                    <para>if the condition has a pattern, it must be a pattern variable, and the
-                    patterned type is <literal>T&amp;[]</literal>, where the specifier expression is 
-                    of type <literal>T</literal> and <literal>T</literal> has the principal 
-                    instantiation <literal>E[]?</literal>, and the declared type of the variable,
-                    if any, must be <literal>[]</literal>, or</para>
-                </listitem>
-                <listitem>
-                    <para>if the condition contains a value reference, the value will be treated 
-                    by the compiler as having type <literal>T&amp;[]</literal> inside the block or 
-                    expression that immediately follows the condition, where the conditional 
-                    expression is of type <literal>T</literal> and <literal>T</literal> has the 
-                    principal instantiation <literal>E[]?</literal>, and, if this is the only 
-                    condition in the condition list, as having the type <literal>T&amp;[E+]</literal> 
-                    inside the following <literal>else</literal> block or expression if any.</para>
-                </listitem>
-            </itemizedlist>
+            <comment><para>Note: the compiler produces a warning if either <literal>T&amp;Object</literal>
+            or <literal>T&amp;Null</literal> is <literal>Nothing</literal>.</para></comment>
             
             <para>If you prefer, you can think of the following:</para>
             
@@ -2170,9 +2090,106 @@ if (is Usable tx) { ... }</programlisting>
             <para>Where the <literal>name</literal> declared by the condition hides the outer 
             declaration of <literal>name</literal> inside the block that follows.</para>
         
-            <para>As a special exception to the above, if a condition occurs in a <literal>dynamic</literal> 
-            block, and the conditional expression has no type, and the condition contains a value reference, 
-            then the value will be treated by the compiler as having no type.</para>
+            <para>As a special exception to the above, if a condition occurs in a 
+            <literal>dynamic</literal> block, and the conditional expression has no type, and 
+            the condition contains a value reference, then the value will be treated by the 
+            compiler as having no type.</para>
+            
+        </section>
+        
+        <section id="nonemptyconditions">
+            <title>Nonemptiness conditions</title>
+            
+            <para>A nonemptiness condition may contain either:</para>
+            
+            <itemizedlist>
+                <listitem>
+                    <para>an unqualified value reference to a non-<literal>variable</literal>,
+                    non-<literal>default</literal> reference, or</para>
+                </listitem>
+                <listitem>
+                    <para>a pattern together with an expression.</para>
+                </listitem>
+            </itemizedlist>
+                    
+            <synopsis>NonemptyCondition: "!"? "nonempty" (Pattern Specifier | MemberName)</synopsis>
+            
+            <para>A <emphasis>negated</emphasis> condition is one which starts with 
+            <literal>!</literal>.</para>
+            
+            <para>The type of the value reference or expression must be a subtype of 
+            <literal>Anything[]?</literal>.</para>
+            
+            <para>Every nonemptiness condition is equivalent to&mdash;and may be considered an
+            abbreviation of&mdash;an assignability condition:</para>
+            
+            <itemizedlist>
+                <listitem>
+                    <para><literal>nonempty x</literal> is equivalent to <literal>!is []? x</literal>, 
+                    and</para>
+                </listitem>
+                <listitem>
+                    <para><literal>!nonempty x</literal> is equivalent to <literal>is []? x</literal>.</para>
+                </listitem>
+            </itemizedlist>
+            
+            <para>For a nonemptiness condition which is not negated:</para>
+            
+            <itemizedlist>
+                <listitem>
+                    <para>if the condition has a pattern, the patterned type is
+                    <literal>T~&lt;[]?&gt;</literal>, where the specifier expression is of type 
+                    <literal>T</literal>, and, if the pattern is a pattern variable, the declared 
+                    type of the variable, if any, must be a subtype of <literal>[Anything+]</literal>, 
+                    or</para>
+                </listitem>
+                <listitem>
+                    <para>if the condition contains a value reference, the value will be treated 
+                    by the compiler as having type <literal>T~&lt;[]?&gt;</literal> inside the block 
+                    or expression that immediately follows the condition, where the conditional 
+                    expression is of type <literal>T</literal>, and, if this is the only condition 
+                    in the condition list, as having the type <literal>T&amp;&lt;[]?&gt;</literal> 
+                    inside the following <literal>else</literal> block or expression if any.</para>
+                </listitem>
+            </itemizedlist>
+            
+            <para>For a negated nonemptiness condition:</para>
+            
+            <itemizedlist>
+                <listitem>
+                    <para>if the condition has a pattern, it must be a pattern variable, and the
+                    patterned type is <literal>T&amp;&lt;[]?&gt;</literal> and the declared 
+                    type of the variable, if any, must be a subtype of <literal>[]?</literal>,
+                    or</para>
+                </listitem>
+                <listitem>
+                    <para>if the condition contains a value reference, the value will be treated 
+                    by the compiler as having type <literal>T&amp;&lt;[]?&gt;</literal> inside the 
+                    block or expression that immediately follows the condition, where the conditional 
+                    expression is of type <literal>T</literal>, and, if this is the only condition 
+                    in the condition list, as having the type <literal>T~&lt;[]?&gt;</literal> 
+                    inside the following <literal>else</literal> block or expression if any.</para>
+                </listitem>
+            </itemizedlist>
+            
+            <comment><para>Note: the compiler produces a warning if either <literal>T&amp;&lt;[]?&gt;</literal>
+            or <literal>T~&lt;[]?&gt;</literal> is <literal>Nothing</literal>.</para></comment>
+            
+            <para>If you prefer, you can think of the following:</para>
+            
+            <programlisting>if (nonempty seq) { ... }</programlisting>
+            
+            <para>As an abbreviation of:</para>
+            
+            <programlisting>if (nonempty seq = seq) { ... }</programlisting>
+            
+            <para>Where the <literal>seq</literal> declared by the condition hides the outer 
+            declaration of <literal>seq</literal> inside the block that follows.</para>
+        
+            <para>As a special exception to the above, if a condition occurs in a 
+            <literal>dynamic</literal> block, and the conditional expression has no type, and 
+            the condition contains a value reference, then the value will be treated by the 
+            compiler as having no type.</para>
             
         </section>
         
@@ -2180,49 +2197,95 @@ if (is Usable tx) { ... }</programlisting>
             <title>Case conditions</title>
             
             <para>The branches of a <literal>switch</literal> conditional each belong to a 
-            <emphasis>case condition</emphasis>. There are two kinds of case condition:</para> 
+            <emphasis>case condition</emphasis>. There are three kinds of case condition:</para> 
             
             <itemizedlist>
                 <listitem>
-                    <para>a <emphasis>value case</emphasis>&mdash;a list of string literals, 
-                    character literals, integer literals, negated integer literals, value 
-                    references to value constructors, and/or value references to anonymous 
-                    classes, or</para>
+                    <para>a <emphasis>value case</emphasis>&mdash;a list of constant values,</para>
                 </listitem>
                 <listitem>
                     <para>a <emphasis>type case</emphasis>&mdash;an assignability condition 
-                    of form <literal>is V</literal> for some type <literal>V</literal>.</para>
+                    of form <literal>is V</literal> for some type <literal>V</literal>, and</para>
+                </listitem>
+                <listitem>
+                    <para>a <emphasis>pattern case</emphasis>&mdash;a tuple or entry pattern,
+                    as defined above in <xref linkend="patterns"/>, where all pattern variables
+                    declare explicit types.</para>
                 </listitem>
             </itemizedlist>
+                        
+            <synopsis>CaseCondition: "(" (ValueCase | TypeCase | PatternCase) ")"</synopsis>
+            <synopsis>ValueCase: Constant ("|" Constant)*</synopsis>
+            <synopsis>TypeCase: "is" Type</synopsis>
+            <synopsis>PatternCase: TuplePattern | EntryPattern</synopsis>
             
-            <para>For a value case, each value reference must be to:</para>
+            <para>A <emphasis>constant value</emphasis> is:</para>
             
             <itemizedlist>
                 <listitem>
-                    <para>a toplevel anonymous class that is a subtype of 
-                    <literal>Identifiable|Null</literal>, or</para>
+                    <para>a value reference, as defined in <xref linkend="valuereferences"/>,
+                    to</para>
+		            <itemizedlist>
+		                <listitem>
+		                    <para>a toplevel anonymous class, or</para>
+		                </listitem>
+		                <listitem>
+		                    <para>a value constructor of a toplevel class that is a subtype of 
+		                    <literal>Identifiable</literal>,</para>
+		                </listitem>
+		            </itemizedlist>
                 </listitem>
                 <listitem>
-                    <para>a value constructor of a toplevel class that is a subtype of 
-                    <literal>Identifiable</literal>.</para>
+                    <para>a string literal, character literal, integer literal, or negated 
+                    integer literal, or</para>
+                </listitem>
+                <listitem>
+                    <para>a tuple enumeration, as defined in <xref linkend="enumeration"/>, 
+                    of constant values.</para>
                 </listitem>
             </itemizedlist>
             
-            <synopsis>CaseCondition: "(" (ValueCase | TypeCase) ")"</synopsis>
-            <synopsis>ValueCase: CaseValue ("|" CaseValue)*</synopsis>
-            <synopsis>TypeCase: "is" Type</synopsis>
-            <synopsis>CaseValue: LiteralCase | BaseExpression | ConstructorExpression</synopsis>
-            <synopsis>LiteralCase: "-"? IntegerLiteral | CharacterLiteral | StringLiteral | VerbatimStringLiteral</synopsis>
+            <synopsis>Constant: BaseExpression | ConstructorExpression | LiteralConstant | TupleConstant</synopsis>
+            <synopsis>LiteralConstant: "-"? IntegerLiteral | CharacterLiteral | StringLiteral | VerbatimStringLiteral</synopsis>
+            <synopsis>TupleConstant: "[" (Constant (", " Constant))? "]"</synopsis>
             
             <para>Every case condition has a type:</para>
             
             <itemizedlist>
                 <listitem>
-                    <para>for a value case, the type is the union of the types of the values, 
-                    and</para>
+                    <para>for a value case, the type is the union of the types of the values,
+                    </para>
                 </listitem>
                 <listitem>
-                    <para>for a type case, the type is the specified type.</para>
+                    <para>for a type case, the type is the specified type, and</para>
+                </listitem>
+                <listitem>
+                    <para>for a pattern case, the type is formed from the explicit types
+                    declared by the pattern variables:</para>
+                    <itemizedlist>
+                        <listitem>
+                            <para>the type of a tuple pattern with one element pattern is 
+                            <literal>[T]</literal>, where <literal>T</literal> is the type
+                            of its element pattern,</para>
+                        </listitem>
+                        <listitem>
+                            <para>the type of a tuple pattern with more than one element pattern
+                            is <literal>Tuple&lt;T,F,R&gt;</literal>, where <literal>F</literal> 
+                            is the type of its first element pattern, <literal>R</literal> is
+                            the type of the tuple pattern formed by removing its first element
+                            pattern, and <literal>T</literal> is the union of the types of all 
+                            its element patterns,</para>
+                        </listitem>
+                        <listitem>
+                            <para>the type of an entry pattern is <literal>K->V</literal> 
+                            where <literal>K</literal> is the type of its key pattern, and
+                            <literal>K</literal> is the type of its item pattern, and</para>
+                        </listitem>
+                        <listitem>
+                            <para>the type of a pattern variable is its explicitly declared
+                            type.</para>
+                        </listitem>
+                    </itemizedlist>
                 </listitem>
             </itemizedlist>
             
@@ -2256,9 +2319,9 @@ if (is Usable tx) { ... }</programlisting>
             <literal>switch</literal> expression will be treated by the compiler as having 
             the type <literal>V</literal> inside the <literal>case</literal> block.</para>
             
-            <comment><para>Note: a type case may narrow to an intersection or union type.</para>
+            <!--comment><para>Note: a type case may narrow to an intersection or union type.</para>
             <programlisting>case (is Persistent &amp; Serializable) { ... }</programlisting>
-            <programlisting>case (is Integer | Float) { ... }</programlisting></comment>
+            <programlisting>case (is Integer | Float) { ... }</programlisting></comment-->
             
         </section>
                 
@@ -2432,8 +2495,8 @@ else {
             
             <itemizedlist>
                 <listitem>
-                    <para>a chain of one or more child <literal>case</literal> clauses, 
-                    and,</para>
+                    <para>a chain of one or more child <literal>case</literal> and
+                    <literal>else case</literal> clauses, and,</para>
                 </listitem>
                 <listitem>
                     <para>optionally, a chain of an arbitrary number of child 
@@ -2444,7 +2507,7 @@ else {
                 </listitem>
             </itemizedlist>
             
-            <synopsis>Case: "case" CaseCondition Block</synopsis>
+            <synopsis>Case: "else"? "case" CaseCondition Block</synopsis>
             
             <para>Two <literal>case</literal>s are said to be <emphasis>disjoint</emphasis> 
             if:</para>
@@ -2461,8 +2524,9 @@ else {
                 </listitem>
             </itemizedlist>
               
-            <para>In every <literal>switch</literal> statement, all <literal>case</literal>s 
-            must be mutually disjoint.</para>
+            <para>In every <literal>switch</literal> statement, every pair of 
+            <literal>case</literal>s must be disjoint, unless one is an 
+            <literal>else case</literal>.</para>
             
             <para>A <literal>switch</literal> is <emphasis>exhaustive</emphasis> if there 
             are no literal values in its <literal>case</literal>s, and the union type formed 
@@ -2773,6 +2837,23 @@ else "total must be less than ``bound``";</programlisting>
             </comment>
             
         </section>
+        
+        <section id="destructuringstatements">
+            <title>Destructuring statements</title>
+            
+            <para>A <emphasis>destructuring statement</emphasis> assigns expressions 
+            to patterns, as defined above in <xref linkend="patterns"/>.</para>
+            
+            <synopsis>Destructure: "let" "(" Pattern Specifier ("," Pattern Specifier)* ")" ";"</synopsis>
+            
+            <para>The type of a specified expression is the patterned type of the
+            corresponding pattern.</para>
+            
+             <programlisting>let ([x, y] = pair, d = sqrt(x^2+y^2));</programlisting>
+            
+        </section>
+        
+        
                  
     </section>
 

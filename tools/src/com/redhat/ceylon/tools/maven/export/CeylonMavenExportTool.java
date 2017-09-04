@@ -46,11 +46,11 @@ import com.redhat.ceylon.model.cmr.RepositoryException;
 import com.redhat.ceylon.tools.moduleloading.ModuleLoadingTool;
 
 @Summary("Generate a Maven repository for a given module")
-@Description("Gerate Maven repository which contains the given module and all its run-time"
-        + " dependencies, including the Ceylon run-time, which makes that repository usable by"
+@Description("Generate Maven repository which contains the given module and all its run-time"
+        + " dependencies, including the Ceylon runtime, which makes that repository usable by"
         + " Maven as a regular Maven repository.\n\n"
-        + "Alternately, running with `--for-import` creates a special repository set up suitable"
-        + " for importing the Ceylon distribution to Maven Central. This is mostly useful for the"
+        + "Alternatively, running with `--for-import` creates a special repository set up suitable"
+        + " for importing the Ceylon distribution into Maven Central. This is mostly useful for the"
         + " Ceylon team."
 )
 public class CeylonMavenExportTool extends ModuleLoadingTool {
@@ -662,12 +662,16 @@ public class CeylonMavenExportTool extends ModuleLoadingTool {
                     if(moduleArtifact != null){
                         mavenCoordinates[0] = moduleArtifact.groupId();
                         mavenCoordinates[1] = moduleArtifact.artifactId();
+                        mavenCoordinates[2] = moduleArtifact.classifier();
                     }
 
                     writeOpen(out, "dependency");
                     {
                         writeElement(out, "groupId", mavenCoordinates[0]);
                         writeElement(out, "artifactId", mavenCoordinates[1]);
+                        if (mavenCoordinates[2]!=null) {
+                            writeElement(out, "classifier", mavenCoordinates[2]);
+                        }
 
                         if(forceVersion
                                 || !(forImport || forSdkImport) 
@@ -698,10 +702,8 @@ public class CeylonMavenExportTool extends ModuleLoadingTool {
     }
 
     private String getDependencyPropertyName(String name) {
-        if(name.startsWith("org.apache.maven."))
-            return "org.apache.maven";
-        else if(name.startsWith("org.eclipse.aether."))
-            return "org.eclipse.aether";
+        if(name.startsWith("com.redhat.ceylon.aether."))
+            return "com.redhat.ceylon.aether";
         else
             return name.replace(':', '.');
     }
@@ -733,8 +735,8 @@ public class CeylonMavenExportTool extends ModuleLoadingTool {
 
     @Override
     protected boolean shouldExclude(String moduleName, String version) {
-        return super.shouldExclude(moduleName, version) ||
-                this.excludedModules.contains(moduleName);
+        return super.shouldExclude(moduleName, version) 
+            || this.excludedModules.contains(moduleName);
     }
     
     @Override

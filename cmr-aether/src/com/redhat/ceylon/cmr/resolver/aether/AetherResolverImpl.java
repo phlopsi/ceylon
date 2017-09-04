@@ -26,57 +26,57 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-import org.apache.maven.model.Model;
-import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
-import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
-import org.apache.maven.settings.Activation;
-import org.apache.maven.settings.Mirror;
-import org.apache.maven.settings.Profile;
-import org.apache.maven.settings.Proxy;
-import org.apache.maven.settings.Repository;
-import org.apache.maven.settings.Server;
-import org.apache.maven.settings.Settings;
-import org.apache.maven.settings.building.DefaultSettingsBuilder;
-import org.apache.maven.settings.building.DefaultSettingsBuilderFactory;
-import org.apache.maven.settings.building.DefaultSettingsBuildingRequest;
-import org.apache.maven.settings.building.SettingsBuildingException;
-import org.apache.maven.settings.building.SettingsBuildingRequest;
-import org.apache.maven.settings.building.SettingsBuildingResult;
-import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.eclipse.aether.ConfigurationProperties;
-import org.eclipse.aether.DefaultRepositorySystemSession;
-import org.eclipse.aether.RepositorySystem;
-import org.eclipse.aether.artifact.Artifact;
-import org.eclipse.aether.artifact.DefaultArtifact;
-import org.eclipse.aether.collection.CollectRequest;
-import org.eclipse.aether.collection.DependencyCollectionContext;
-import org.eclipse.aether.collection.DependencySelector;
-import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
-import org.eclipse.aether.graph.DefaultDependencyNode;
-import org.eclipse.aether.graph.Dependency;
-import org.eclipse.aether.graph.DependencyFilter;
-import org.eclipse.aether.graph.DependencyNode;
-import org.eclipse.aether.impl.DefaultServiceLocator;
-import org.eclipse.aether.repository.LocalRepository;
-import org.eclipse.aether.repository.RemoteRepository;
-import org.eclipse.aether.repository.RepositoryPolicy;
-import org.eclipse.aether.resolution.ArtifactRequest;
-import org.eclipse.aether.resolution.ArtifactResolutionException;
-import org.eclipse.aether.resolution.DependencyRequest;
-import org.eclipse.aether.resolution.DependencyResolutionException;
-import org.eclipse.aether.resolution.VersionRangeRequest;
-import org.eclipse.aether.resolution.VersionRangeResolutionException;
-import org.eclipse.aether.resolution.VersionRangeResult;
-import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
-import org.eclipse.aether.spi.connector.transport.TransporterFactory;
-import org.eclipse.aether.transport.file.FileTransporterFactory;
-import org.eclipse.aether.transport.http.HttpTransporterFactory;
-import org.eclipse.aether.util.artifact.JavaScopes;
-import org.eclipse.aether.util.repository.AuthenticationBuilder;
-import org.eclipse.aether.util.repository.DefaultAuthenticationSelector;
-import org.eclipse.aether.util.repository.DefaultMirrorSelector;
-import org.eclipse.aether.util.repository.DefaultProxySelector;
-import org.eclipse.aether.version.Version;
+import com.redhat.ceylon.aether.apache.maven.model.Model;
+import com.redhat.ceylon.aether.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import com.redhat.ceylon.aether.apache.maven.repository.internal.MavenRepositorySystemUtils;
+import com.redhat.ceylon.aether.apache.maven.settings.Activation;
+import com.redhat.ceylon.aether.apache.maven.settings.Mirror;
+import com.redhat.ceylon.aether.apache.maven.settings.Profile;
+import com.redhat.ceylon.aether.apache.maven.settings.Proxy;
+import com.redhat.ceylon.aether.apache.maven.settings.Repository;
+import com.redhat.ceylon.aether.apache.maven.settings.Server;
+import com.redhat.ceylon.aether.apache.maven.settings.Settings;
+import com.redhat.ceylon.aether.apache.maven.settings.building.DefaultSettingsBuilder;
+import com.redhat.ceylon.aether.apache.maven.settings.building.DefaultSettingsBuilderFactory;
+import com.redhat.ceylon.aether.apache.maven.settings.building.DefaultSettingsBuildingRequest;
+import com.redhat.ceylon.aether.apache.maven.settings.building.SettingsBuildingException;
+import com.redhat.ceylon.aether.apache.maven.settings.building.SettingsBuildingRequest;
+import com.redhat.ceylon.aether.apache.maven.settings.building.SettingsBuildingResult;
+import com.redhat.ceylon.aether.codehaus.plexus.util.xml.pull.XmlPullParserException;
+import com.redhat.ceylon.aether.eclipse.aether.ConfigurationProperties;
+import com.redhat.ceylon.aether.eclipse.aether.DefaultRepositorySystemSession;
+import com.redhat.ceylon.aether.eclipse.aether.RepositorySystem;
+import com.redhat.ceylon.aether.eclipse.aether.artifact.Artifact;
+import com.redhat.ceylon.aether.eclipse.aether.artifact.DefaultArtifact;
+import com.redhat.ceylon.aether.eclipse.aether.collection.CollectRequest;
+import com.redhat.ceylon.aether.eclipse.aether.collection.DependencyCollectionContext;
+import com.redhat.ceylon.aether.eclipse.aether.collection.DependencySelector;
+import com.redhat.ceylon.aether.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
+import com.redhat.ceylon.aether.eclipse.aether.graph.DefaultDependencyNode;
+import com.redhat.ceylon.aether.eclipse.aether.graph.Dependency;
+import com.redhat.ceylon.aether.eclipse.aether.graph.DependencyFilter;
+import com.redhat.ceylon.aether.eclipse.aether.graph.DependencyNode;
+import com.redhat.ceylon.aether.eclipse.aether.impl.DefaultServiceLocator;
+import com.redhat.ceylon.aether.eclipse.aether.repository.LocalRepository;
+import com.redhat.ceylon.aether.eclipse.aether.repository.RemoteRepository;
+import com.redhat.ceylon.aether.eclipse.aether.repository.RepositoryPolicy;
+import com.redhat.ceylon.aether.eclipse.aether.resolution.ArtifactRequest;
+import com.redhat.ceylon.aether.eclipse.aether.resolution.ArtifactResolutionException;
+import com.redhat.ceylon.aether.eclipse.aether.resolution.DependencyRequest;
+import com.redhat.ceylon.aether.eclipse.aether.resolution.DependencyResolutionException;
+import com.redhat.ceylon.aether.eclipse.aether.resolution.VersionRangeRequest;
+import com.redhat.ceylon.aether.eclipse.aether.resolution.VersionRangeResolutionException;
+import com.redhat.ceylon.aether.eclipse.aether.resolution.VersionRangeResult;
+import com.redhat.ceylon.aether.eclipse.aether.spi.connector.RepositoryConnectorFactory;
+import com.redhat.ceylon.aether.eclipse.aether.spi.connector.transport.TransporterFactory;
+import com.redhat.ceylon.aether.eclipse.aether.transport.file.FileTransporterFactory;
+import com.redhat.ceylon.aether.eclipse.aether.transport.http.HttpTransporterFactory;
+import com.redhat.ceylon.aether.eclipse.aether.util.artifact.JavaScopes;
+import com.redhat.ceylon.aether.eclipse.aether.util.repository.AuthenticationBuilder;
+import com.redhat.ceylon.aether.eclipse.aether.util.repository.DefaultAuthenticationSelector;
+import com.redhat.ceylon.aether.eclipse.aether.util.repository.DefaultMirrorSelector;
+import com.redhat.ceylon.aether.eclipse.aether.util.repository.DefaultProxySelector;
+import com.redhat.ceylon.aether.eclipse.aether.version.Version;
 
 /**
  * Aether utils.
@@ -89,6 +89,7 @@ public class AetherResolverImpl implements AetherResolver {
     private int timeout;
     private boolean offline;
     private String settingsXml;
+    private String rootFolderOverride;
 
     private static RepositorySystem newRepositorySystem() {
         DefaultServiceLocator locator = MavenRepositorySystemUtils.newServiceLocator();
@@ -110,15 +111,18 @@ public class AetherResolverImpl implements AetherResolver {
         SettingsBuildingRequest settingsBuilderRequest = new DefaultSettingsBuildingRequest();
         settingsBuilderRequest.setSystemProperties(System.getProperties());
         
-        // find the settings
-        String settingsFile = settingsXml;
-        if(settingsFile == null){
-        	File userSettings = new File(System.getProperty("user.home"), ".m2/settings.xml");
-        	if(userSettings.exists())
-        		settingsFile = userSettings.getAbsolutePath();
-        }
-        if(settingsFile != null){
-        	settingsBuilderRequest.setUserSettingsFile(new File(settingsXml));
+        // if we have a root folder, don't read settings at all
+        if(rootFolderOverride == null){
+            // find the settings
+            String settingsFile = settingsXml;
+            if(settingsFile == null){
+                File userSettings = new File(System.getProperty("user.home"), ".m2/settings.xml");
+                if(userSettings.exists())
+                    settingsFile = userSettings.getAbsolutePath();
+            }
+            if(settingsFile != null){
+                settingsBuilderRequest.setUserSettingsFile(new File(settingsXml));
+            }
         }
         
         // read it
@@ -131,26 +135,26 @@ public class AetherResolverImpl implements AetherResolver {
         Settings set = settingsBuildingResult.getEffectiveSettings();
         
         // configure the local repo
-        String localRepository = set.getLocalRepository();
+        String localRepository = rootFolderOverride;
         if(localRepository == null)
-        	localRepository = System.getProperty("user.home")+File.separator+".m2"+File.separator+"repository";
-        else {
-            if (! new File(localRepository).isAbsolute() && currentDirectory != null) {
-                localRepository = new File(new File(currentDirectory), localRepository).getAbsolutePath();
-            }
-        }
+            localRepository = set.getLocalRepository();
+        if(localRepository == null)
+        	    localRepository = System.getProperty("user.home")+File.separator+".m2"+File.separator+"repository";
+        else if (! new File(localRepository).isAbsolute() && currentDirectory != null)
+            localRepository = new File(new File(currentDirectory), localRepository).getAbsolutePath();
+        LocalRepository localRepo = new LocalRepository( localRepository );
 
         // set up authentication
         DefaultAuthenticationSelector authenticationSelector = new DefaultAuthenticationSelector();
         for(Server server : set.getServers()){
-    		AuthenticationBuilder auth = new AuthenticationBuilder();
-    		if(server.getUsername() != null)
-    			auth.addUsername(server.getUsername());
-    		if(server.getPassword() != null)
-    			auth.addPassword(server.getPassword());
-    		if(server.getPrivateKey() != null)
-    			auth.addPrivateKey(server.getPrivateKey(), server.getPassphrase());
-        	authenticationSelector.add(server.getId(), auth.build());
+        		AuthenticationBuilder auth = new AuthenticationBuilder();
+        		if(server.getUsername() != null)
+        			auth.addUsername(server.getUsername());
+        		if(server.getPassword() != null)
+        			auth.addPassword(server.getPassword());
+        		if(server.getPrivateKey() != null)
+        			auth.addPrivateKey(server.getPrivateKey(), server.getPassphrase());
+            	authenticationSelector.add(server.getId(), auth.build());
         }
 		session.setAuthenticationSelector(authenticationSelector );
         
@@ -164,26 +168,30 @@ public class AetherResolverImpl implements AetherResolver {
         // set up proxies
         DefaultProxySelector proxySelector = new DefaultProxySelector();
         for(Proxy proxy : set.getProxies()){
-        	if(proxy.isActive()){
-        		AuthenticationBuilder auth = new AuthenticationBuilder();
-        		if(proxy.getUsername() != null)
-        			auth.addUsername(proxy.getUsername());
-        		if(proxy.getPassword() != null)
-        			auth.addPassword(proxy.getPassword());
-				org.eclipse.aether.repository.Proxy p = new org.eclipse.aether.repository.Proxy(proxy.getProtocol(), proxy.getHost(), 
-						proxy.getPort(), auth.build() );
-				proxySelector.add(p , proxy.getNonProxyHosts());
-        	}
+            	if(proxy.isActive()){
+            		AuthenticationBuilder auth = new AuthenticationBuilder();
+            		if(proxy.getUsername() != null)
+            			auth.addUsername(proxy.getUsername());
+            		if(proxy.getPassword() != null)
+            			auth.addPassword(proxy.getPassword());
+    				proxySelector.add(
+    				        new com.redhat.ceylon.aether.eclipse.aether.repository.Proxy(
+    				                proxy.getProtocol(), proxy.getHost(), proxy.getPort(), 
+    				                auth.build() ), 
+    				        proxy.getNonProxyHosts());
+            	}
         }
 		session.setProxySelector(proxySelector);
         
         // set up remote repos
         List<RemoteRepository> repos = new ArrayList<>();
+        
         RemoteRepository central = new RemoteRepository.Builder( "central", "default", "http://repo1.maven.org/maven2/" ).build();
         repos.add(central);
+        
         Set<String> activeProfiles = new HashSet<>();
         activeProfiles.addAll(set.getActiveProfiles());
-        for (Profile profile : set.getProfiles()) {
+        for(Profile profile : set.getProfiles()){
             Activation activation = profile.getActivation();
             if(activation != null){
                 if(activation.isActiveByDefault())
@@ -201,7 +209,6 @@ public class AetherResolverImpl implements AetherResolver {
         session.setConfigProperty(ConfigurationProperties.CONNECT_TIMEOUT, timeout);
         session.setOffline(offline || set.isOffline());
         
-        LocalRepository localRepo = new LocalRepository( localRepository );
         session.setLocalRepositoryManager( system.newLocalRepositoryManager( session, localRepo ) );
 
         return repos;
@@ -212,7 +219,7 @@ public class AetherResolverImpl implements AetherResolver {
             RemoteRepository.Builder remoteRepo = new RemoteRepository.Builder( repo.getId(), repo.getLayout(), repo.getUrl() );
 
             // policies
-            org.apache.maven.settings.RepositoryPolicy repoReleasePolicy = repo.getReleases();
+            com.redhat.ceylon.aether.apache.maven.settings.RepositoryPolicy repoReleasePolicy = repo.getReleases();
             if(repoReleasePolicy != null){
                 String updatePolicy = repoReleasePolicy.getUpdatePolicy();
                 // This is the default anyway and saves us a message on STDERR
@@ -223,7 +230,7 @@ public class AetherResolverImpl implements AetherResolver {
                 remoteRepo.setReleasePolicy(releasePolicy );
             }
             
-            org.apache.maven.settings.RepositoryPolicy repoSnapshotPolicy = repo.getSnapshots();
+            com.redhat.ceylon.aether.apache.maven.settings.RepositoryPolicy repoSnapshotPolicy = repo.getSnapshots();
             if(repoSnapshotPolicy != null){
                 String updatePolicy = repoSnapshotPolicy.getUpdatePolicy();
                 // This is the default anyway and saves us a message on STDERR
@@ -253,11 +260,12 @@ public class AetherResolverImpl implements AetherResolver {
     };
     
 
-    public AetherResolverImpl(String currentDirectory, String settingsXml, boolean offline, int timeout) {
+    public AetherResolverImpl(String currentDirectory, String settingsXml, String rootFolderOverride, boolean offline, int timeout) {
         this.currentDirectory = currentDirectory;
         this.timeout = timeout;
         this.offline = offline;
         this.settingsXml = settingsXml;
+        this.rootFolderOverride = rootFolderOverride;
     }
 
     @Override
@@ -412,10 +420,10 @@ public class AetherResolverImpl implements AetherResolver {
             public boolean selectDependency(Dependency dep) {
                 // Not System, though we could support it
                 return JavaScopes.COMPILE.equals(dep.getScope())
-                            || JavaScopes.RUNTIME.equals(dep.getScope())
-                            || JavaScopes.PROVIDED.equals(dep.getScope())
-                            // TEST is useless ATM and is nothing but trouble
-//                            || JavaScopes.TEST.equals(dep.getScope())
+                    || JavaScopes.RUNTIME.equals(dep.getScope())
+                    || JavaScopes.PROVIDED.equals(dep.getScope())
+                    // TEST is useless ATM and is nothing but trouble
+//                  || JavaScopes.TEST.equals(dep.getScope())
                             ;
             }
         });
@@ -441,8 +449,8 @@ public class AetherResolverImpl implements AetherResolver {
         if(a == null || b == null)
             return false;
         return myEquals(a.getArtifact(), b.getArtifact())
-                && a.isOptional() == b.isOptional()
-                && Objects.equals(a.getScope(), b.getScope());
+            && a.isOptional() == b.isOptional()
+            && Objects.equals(a.getScope(), b.getScope());
     }
 
     private boolean myEquals(Artifact a, Artifact b) {
@@ -452,12 +460,11 @@ public class AetherResolverImpl implements AetherResolver {
             return false;
         // Don't use Artifact.equals because it compares Properties which we don't want
         return Objects.equals(a.getArtifactId(), b.getArtifactId())
-                && Objects.equals(a.getGroupId(), b.getGroupId())
-                && Objects.equals(a.getVersion(), b.getVersion())
-                && Objects.equals(a.getClassifier(), b.getClassifier())
-                && Objects.equals(a.getExtension(), b.getExtension())
-                && Objects.equals(a.getFile(), b.getFile())
-                ;
+            && Objects.equals(a.getGroupId(), b.getGroupId())
+            && Objects.equals(a.getVersion(), b.getVersion())
+            && Objects.equals(a.getClassifier(), b.getClassifier())
+            && Objects.equals(a.getExtension(), b.getExtension())
+            && Objects.equals(a.getFile(), b.getFile());
     }
 
     private String findExtension(File pomFile) {

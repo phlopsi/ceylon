@@ -5,7 +5,6 @@ import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.getMa
 import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.getTupleType;
 import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.getUnspecifiedParameter;
 import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.involvesTypeParams;
-import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.isGeneric;
 import static com.redhat.ceylon.compiler.typechecker.analyzer.AnalyzerUtil.spreadType;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.addToIntersection;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.addToUnion;
@@ -28,10 +27,10 @@ import com.redhat.ceylon.compiler.typechecker.tree.Node;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree.NamedArgument;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree.PositionalArgument;
+import com.redhat.ceylon.model.typechecker.model.Class;
 import com.redhat.ceylon.model.typechecker.model.Declaration;
 import com.redhat.ceylon.model.typechecker.model.FunctionOrValue;
 import com.redhat.ceylon.model.typechecker.model.Functional;
-import com.redhat.ceylon.model.typechecker.model.Generic;
 import com.redhat.ceylon.model.typechecker.model.Parameter;
 import com.redhat.ceylon.model.typechecker.model.ParameterList;
 import com.redhat.ceylon.model.typechecker.model.Reference;
@@ -150,7 +149,7 @@ public class TypeArgumentInference {
                 }
                 else if (argType.isUnknown()) {
                     //TODO: is this error really necessary now!?
-                    if (argNode.getErrors().isEmpty()) {
+                    if (!argNode.hasErrors()) {
                         argNode.addError("argument of unknown type assigned to inferred type parameter: '" + 
                                 tp.getName() + "' of '" + 
                                 tp.getDeclaration()
@@ -411,6 +410,7 @@ public class TypeArgumentInference {
                 paramType.getTypeArgumentList();
         List<Type> superTypeArgs = 
                 supertype.getTypeArgumentList();
+        Class td = unit.getTupleDeclaration();
         for (int j=0; 
                 j<paramTypeArgs.size() && 
                 j<superTypeArgs.size() && 
@@ -422,6 +422,14 @@ public class TypeArgumentInference {
                     superTypeArgs.get(j);
             TypeParameter typeParameter = 
                     typeParameters.get(j);
+            Declaration tpd = 
+                    typeParameter.getDeclaration();
+            if (j==0 && td.equals(tpd)) {
+                //ignore arguments to the Element
+                //type parameter of Tuple, which
+                //is often quite imprecise
+                continue;
+            }
             boolean co;
             boolean contra;
             if (paramType.isCovariant(typeParameter)) {
@@ -924,10 +932,10 @@ public class TypeArgumentInference {
                 
                 Reference arg = appliedReference(smte);
                 
-                if (!smte.getStaticMethodReferencePrimary() &&
-                        reference instanceof Functional && 
-                        paramDec instanceof Functional &&
-                        paramTypedRef!=null) {
+                if (!smte.getStaticMethodReferencePrimary() 
+                        && reference instanceof Functional 
+                        && paramDec instanceof Functional 
+                        && paramTypedRef!=null) {
                     //when we have actual individualized
                     //parameters on both the given function
                     //ref, and the callable parameter to
@@ -1064,10 +1072,9 @@ public class TypeArgumentInference {
 
     private static boolean isArgumentToGenericParameter(
             TypedReference paramTypedRef, Type paramType) {
-        return paramType.resolveAliases()
-                    .isTypeConstructor() ||
-                paramTypedRef != null &&
-                isGeneric(paramTypedRef.getDeclaration());
+        return paramType.resolveAliases().isTypeConstructor()
+            || paramTypedRef != null
+            && paramTypedRef.getDeclaration().isParameterized();
     }
 
     /**
@@ -1287,7 +1294,7 @@ public class TypeArgumentInference {
     List<Type> getInferredTypeArgsForReference(
             Tree.InvocationExpression that,
             Declaration invoked,
-            Generic generic, Type receiverType) {
+            Declaration generic, Type receiverType) {
         if (invoked instanceof Functional) {
             Functional functional = (Functional) invoked;
             List<ParameterList> parameterLists = 
@@ -1606,9 +1613,11 @@ public class TypeArgumentInference {
     private List<TypeParameter> 
     getTypeParametersAccountingForTypeConstructor(
             Declaration dec) {
-        if (isGeneric(dec)) {
-            Generic generic = (Generic) dec;
-            return generic.getTypeParameters();
+        if (dec==null) {
+            return null;
+        }
+        else if (dec.isParameterized()) {
+            return dec.getTypeParameters();
         }
         else if (dec instanceof Value) {
             Value value = (Value) dec;
@@ -1635,9 +1644,8 @@ public class TypeArgumentInference {
         }
         else {
             List<Type> list;
-            if (isGeneric(dec)) {
-                Generic generic = (Generic) dec;
-                list = typeParametersAsArgList(generic);
+            if (dec.isParameterized()) {
+                list = typeParametersAsArgList(dec);
             }
             else {
                 list = NO_TYPE_ARGS;

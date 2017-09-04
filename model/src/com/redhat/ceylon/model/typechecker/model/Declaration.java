@@ -38,6 +38,7 @@ public abstract class Declaration
 	private boolean otherInstanceAccess;
     protected DeclarationCompleter actualCompleter;
     private List<String> aliases;
+    private List<String> restrictions;
     private int memoizedHash;
 
     public Scope getVisibleScope() {
@@ -116,26 +117,23 @@ public abstract class Declaration
             Declaration d = (Declaration) c;
             name = d.toStringName() + "." + name;
         }
-        if (this instanceof Generic) {
-            Generic g = (Generic) this;
+        if (isParameterized()) {
             List<TypeParameter> typeParams = 
-                    g.getTypeParameters();
-            if (!typeParams.isEmpty()) {
-                StringBuilder params = new StringBuilder();
-                params.append("<");
-                boolean first = true;
-                for (TypeParameter tp: typeParams) {
-                    if (first) {
-                        first = false;
-                    }
-                    else {
-                        params.append(",");
-                    }
-                    params.append(tp.getName());
+                    getTypeParameters();
+            StringBuilder params = new StringBuilder();
+            params.append("<");
+            boolean first = true;
+            for (TypeParameter tp: typeParams) {
+                if (first) {
+                    first = false;
                 }
-                params.append(">");
-                name += params;
+                else {
+                    params.append(",");
+                }
+                params.append(tp.getName());
             }
+            params.append(">");
+            name += params;
         }
         return name;
     }
@@ -293,12 +291,8 @@ public abstract class Declaration
      */
     public boolean isVisible(Scope scope) {
         Scope vs = getVisibleScope();
-        if (vs==null) {
-            return true;
-        }
-        else {
-            return contains(vs, scope);
-        }
+        return (vs==null || contains(vs, scope)) 
+            && withinRestrictions(scope);
         /*
         * Note that this implementation is not quite
         * right, since for a shared member
@@ -313,6 +307,44 @@ public abstract class Declaration
         else {
             return isDefinedInScope(scope);
         }*/
+    }
+
+    private boolean withinRestrictions(Scope scope) {
+        if (scope==null) {
+            //TODO: this is kinda rubbish
+            return true; //getRestrictions()==null;
+        }
+        else if (scope instanceof Package) {
+            return withinRestrictions((Package) scope);
+        }
+        else {
+            return withinRestrictions(scope.getUnit());
+        }
+    }
+
+    public boolean withinRestrictions(Unit unit) {
+        return withinRestrictions(unit.getPackage());
+    }
+
+    private boolean withinRestrictions(Package scope) {
+        return getUnit().getPackage().equals(scope)
+            || withinRestrictions(scope.getModule());
+    }
+    
+    private boolean withinRestrictions(Module module) {
+        List<String> restrictions = getRestrictions();
+        if (restrictions==null) {
+            return true;
+        }
+        else {
+            String name = module.getNameAsString();
+            for (String mod: restrictions) {
+                if (name.equals(mod)) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     /**
@@ -333,6 +365,10 @@ public abstract class Declaration
     }
     
     public boolean isCaptured() {
+        return false;
+    }
+
+    public boolean isJsCaptured() {
         return false;
     }
 
@@ -368,7 +404,7 @@ public abstract class Declaration
      * @see Declaration#isClassOrInterfaceMember()
      */
     public boolean isMember() {
-    	return false;
+    	    return false;
     }
     
     @Override
@@ -665,11 +701,11 @@ public abstract class Declaration
                 ClassOrInterface type = 
                         (ClassOrInterface) 
                             getContainer();
-                return other.getName()!=null && getName()!=null &&
-                        other.getName().equals(getName()) && 
-                        isShared() && other.isShared() &&
-                        //other.getDeclarationKind()==getDeclarationKind() &&
-                        type.isMember(other);
+                return other.getName()!=null && getName()!=null 
+                    && other.getName().equals(getName()) 
+                    && isShared() && other.isShared() 
+                    //&& other.getDeclarationKind()==getDeclarationKind()
+                    && type.isMember(other);
             }
             else {
                 return false;
@@ -763,7 +799,8 @@ public abstract class Declaration
     }
 
     public boolean sameKind(Declaration m) {
-        return m!=null && m.getModelClass()==getModelClass();
+        return m!=null 
+            && m.getModelClass()==getModelClass();
     }
 
     public DeclarationCompleter getActualCompleter() {
@@ -772,6 +809,10 @@ public abstract class Declaration
 
     public void setActualCompleter(DeclarationCompleter actualCompleter) {
         this.actualCompleter = actualCompleter;
+    }
+    
+    public List<TypeParameter> getTypeParameters() {
+        return emptyList();
     }
     
     /**
@@ -793,39 +834,41 @@ public abstract class Declaration
      * @see ModelUtil#typeParametersAsArgList
      */
     Map<TypeParameter, Type> getTypeParametersAsArguments() {
-        if (this instanceof Generic) {
-            Generic g = (Generic) this;
+        if (isParameterized()) {
             List<TypeParameter> typeParameters = 
-                    g.getTypeParameters();
-            if (typeParameters.isEmpty()) {
-                return EMPTY_TYPE_ARG_MAP;
-            }
-            else {
-                Map<TypeParameter,Type> typeArgs = 
-                        new HashMap<TypeParameter,Type>();
-                for (TypeParameter p: typeParameters) {
-                    Type pta = new Type();
-                    if (p.isTypeConstructor()) {
-                        pta.setTypeConstructor(true);
-                        pta.setTypeConstructorParameter(p);
-                    }
-                    pta.setDeclaration(p);
-                    typeArgs.put(p, pta);
+                    getTypeParameters();
+            Map<TypeParameter,Type> typeArgs = 
+                    new HashMap<TypeParameter,Type>();
+            for (TypeParameter p: typeParameters) {
+                Type pta = new Type();
+                if (p.isTypeConstructor()) {
+                    pta.setTypeConstructor(true);
+                    pta.setTypeConstructorParameter(p);
                 }
-                return typeArgs;
+                pta.setDeclaration(p);
+                typeArgs.put(p, pta);
             }
+            return typeArgs;
         }
         else {
             return EMPTY_TYPE_ARG_MAP;
         }
     }
+    
+    public List<String> getRestrictions() {
+        return restrictions;
+    }
+    
+    public void setRestrictions(List<String> restrictions) {
+        this.restrictions = restrictions;
+    }
 
-    public List<String> getAliases(){
+    public List<String> getAliases() {
         return aliases != null ? aliases : 
             Collections.<String>emptyList();
     }
     
-    public void setAliases(List<String> aliases){
+    public void setAliases(List<String> aliases) {
         this.aliases = aliases;
     }
     

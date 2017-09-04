@@ -45,6 +45,7 @@ import com.redhat.ceylon.compiler.typechecker.tree.Tree.QualifiedTypeExpression;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree.SequencedArgument;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree.StaticMemberOrTypeExpression;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree.Term;
+import com.redhat.ceylon.compiler.typechecker.tree.TreeUtil;
 import com.redhat.ceylon.langtools.tools.javac.tree.JCTree;
 import com.redhat.ceylon.langtools.tools.javac.tree.JCTree.JCAnnotation;
 import com.redhat.ceylon.langtools.tools.javac.tree.JCTree.JCExpression;
@@ -53,7 +54,6 @@ import com.redhat.ceylon.langtools.tools.javac.tree.JCTree.JCStatement;
 import com.redhat.ceylon.langtools.tools.javac.tree.JCTree.JCVariableDecl;
 import com.redhat.ceylon.langtools.tools.javac.util.List;
 import com.redhat.ceylon.langtools.tools.javac.util.ListBuffer;
-import com.redhat.ceylon.compiler.typechecker.tree.TreeUtil;
 import com.redhat.ceylon.model.loader.JvmBackendUtil;
 import com.redhat.ceylon.model.loader.NamingBase.Suffix;
 import com.redhat.ceylon.model.typechecker.model.Class;
@@ -64,6 +64,7 @@ import com.redhat.ceylon.model.typechecker.model.Declaration;
 import com.redhat.ceylon.model.typechecker.model.Function;
 import com.redhat.ceylon.model.typechecker.model.Functional;
 import com.redhat.ceylon.model.typechecker.model.Interface;
+import com.redhat.ceylon.model.typechecker.model.ModelUtil;
 import com.redhat.ceylon.model.typechecker.model.Parameter;
 import com.redhat.ceylon.model.typechecker.model.ParameterList;
 import com.redhat.ceylon.model.typechecker.model.Reference;
@@ -87,8 +88,8 @@ abstract class Invocation {
                 return false;
             } else {
                 return ((Tree.QualifiedMemberOrTypeExpression) primary).getMemberOperator() instanceof Tree.MemberOp
-                        && Decl.isValueTypeDecl(qmePrimary)
-                        && (CodegenUtil.isUnBoxed(qmePrimary) || gen.isJavaArray(qmePrimary.getTypeModel()));
+                    && Decl.isValueTypeDecl(qmePrimary)
+                    && (CodegenUtil.isUnBoxed(qmePrimary) || gen.isJavaArray(qmePrimary.getTypeModel()));
             }
         } else {
             return false;
@@ -260,7 +261,7 @@ abstract class Invocation {
             Tree.BaseTypeExpression type = (Tree.BaseTypeExpression)getPrimary();
             Declaration declaration = type.getDeclaration();
             if (Strategy.generateInstantiator(declaration)) {
-                if (Decl.withinInterface(declaration)) {
+                if (declaration.isInterfaceMember()) {
                     if (primaryExpr != null) {
                         // if we have some other primary then respect that
                         actualPrimExpr = primaryExpr;
@@ -288,8 +289,8 @@ abstract class Invocation {
                 Tree.QualifiedMemberOrTypeExpression type = (Tree.QualifiedMemberOrTypeExpression)getPrimary();
                 Declaration declaration = type.getDeclaration();
                 if (Decl.isConstructor(declaration)) {
-                    Class constructedClass = Decl.getConstructedClass(declaration);
-                    if (Decl.withinInterface(constructedClass)) {
+                    Class constructedClass = ModelUtil.getConstructedClass(declaration);
+                    if (constructedClass.isInterfaceMember()) {
                         if (Strategy.generateInstantiator(declaration)) {
                             // Stef: this is disgusting and some of that logic has to be duplicated for base member/type
                             // expressions. it reeks of special-cases that should not be
@@ -317,19 +318,22 @@ abstract class Invocation {
                 }
             }
             if (isIndirect()) {
-                if (getPrimaryDeclaration() != null
-                        && (Decl.isGetter(getPrimaryDeclaration())
-                                || Decl.isToplevel(getPrimaryDeclaration())
-                                || (Decl.isValueOrSharedOrCapturedParam(getPrimaryDeclaration()) 
-                                        && Decl.isCaptured(getPrimaryDeclaration()) 
-                                        && !Decl.isLocalNotInitializer(getPrimaryDeclaration())))) {
+                Declaration primaryDeclaration = getPrimaryDeclaration();
+                if (primaryDeclaration != null
+                        && (Decl.isGetter(primaryDeclaration)
+                                || primaryDeclaration.isToplevel()
+                                || (Decl.isValueOrSharedOrCapturedParam(primaryDeclaration) 
+                                        && ModelUtil.isCaptured(primaryDeclaration) 
+                                        && !ModelUtil.isLocalNotInitializer(primaryDeclaration)
+                                        // don't invoke getters for constructor parameters we're getting within a super call
+                                        && !gen.expressionGen().isWithinSuperInvocation(primaryDeclaration.getContainer())))) {
                     // We need to invoke the getter to obtain the Callable
                     actualPrimExpr = gen.make().Apply(null, 
                             gen.naming.makeQualIdent(primaryExpr, selector), 
                             List.<JCExpression>nil());
                 } else if (selector != null) {
                     actualPrimExpr = gen.naming.makeQualIdent(primaryExpr, selector);
-                } else if (getPrimaryDeclaration() == null || !((TypedDeclaration)getPrimaryDeclaration()).getType().isTypeConstructor()) {
+                } else if (primaryDeclaration == null || !((TypedDeclaration)getPrimaryDeclaration()).getType().isTypeConstructor()) {
                     actualPrimExpr = gen.naming.makeQualifiedName(primaryExpr, (TypedDeclaration)getPrimaryDeclaration(), Naming.NA_MEMBER);
                 }
                 actualPrimExpr = unboxCallableIfNecessary(actualPrimExpr, getPrimary());
@@ -405,7 +409,7 @@ abstract class Invocation {
     protected Constructor getConstructorFromPrimary(
             Declaration primaryDeclaration) {
         if (Decl.isConstructor(primaryDeclaration)) {
-            primaryDeclaration = Decl.getConstructor(primaryDeclaration);
+            primaryDeclaration = ModelUtil.getConstructor(primaryDeclaration);
         }
         if (primaryDeclaration instanceof Constructor) {
             return (Constructor)primaryDeclaration;
@@ -420,8 +424,8 @@ abstract class Invocation {
                 return null;
             }
         } else if (primaryDeclaration instanceof Class
-                && Decl.getDefaultConstructor((Class)primaryDeclaration) != null) {
-            return Decl.getDefaultConstructor((Class)primaryDeclaration);
+                && ((Class)primaryDeclaration).getDefaultConstructor() != null) {
+            return ((Class)primaryDeclaration).getDefaultConstructor();
         } else {
             return null;
         }
@@ -434,9 +438,9 @@ abstract class Invocation {
         // the exception to that is if and switch expressions
         // with all branches being null.
         return expr.getTypeErased()
-                && gen.isNullValue(expr.getTypeModel())
-                && (expr instanceof Tree.SwitchExpression
-                        ||expr instanceof Tree.IfExpression);
+            && gen.isNullValue(expr.getTypeModel())
+            && (expr instanceof Tree.SwitchExpression
+                    || expr instanceof Tree.IfExpression);
     }
 }
 
@@ -567,7 +571,7 @@ class IndirectInvocation extends SimpleInvocation {
 
         Type callableType = primary.getTypeModel();
 
-        this.unknownArguments = gen.isUnknownArgumentsCallable(callableType);
+        this.unknownArguments = gen.typeFact().isUnknownArgumentsCallable(callableType);
         
         final java.util.List<Type> parameterTypes;
         // if we have an unknown parameter list, like Callble<Ret,Args>, we can't look at parameter types
@@ -842,12 +846,11 @@ abstract class DirectInvocation extends SimpleInvocation {
     private void addTypeConstructorArguments(
             java.util.List<Type> typeArgumentList,
             ListBuffer<ExpressionAndType> result) {
-        int ii = 0;
-        for(Type reifiedTypeArg : typeArgumentList)
+        for(int i = 0; i<typeArgumentList.size(); i++)
             result.append(new ExpressionAndType(
                     gen.make().Indexed(
                             gen.makeUnquotedIdent("applied"),
-                            gen.make().Literal(ii++)), 
+                            gen.make().Literal(i)), 
                     gen.makeTypeDescriptorType()));
     }
 
@@ -936,7 +939,11 @@ class PositionalInvocation extends DirectInvocation {
             Tree.Expression expr = ((Tree.ListedArgument) arg).getExpression();
             if (expr.getTerm() instanceof FunctionArgument) {
                 FunctionArgument farg = (FunctionArgument)expr.getTerm();
-                return gen.expressionGen().transform(farg, getParameterType(argIndex));
+                Type parameterType = getParameterType(argIndex);
+                if(isParameterJavaVariadic(argIndex) && parameterType.isSequential()){
+                    parameterType = gen.typeFact().getSequentialElementType(parameterType);
+                }
+                return gen.expressionGen().transform(farg, parameterType);
             }
         }
         // special case for comprehensions which are not expressions
@@ -1254,6 +1261,11 @@ class CallableInvocation extends DirectInvocation {
         if(!isCallableToFunctionalInterfaceBridge)
             super.addReifiedArguments(result);
     }
+    
+    @Override
+    public boolean isIndirect() {
+        return true;
+    }
 }
 
 /**
@@ -1265,7 +1277,7 @@ class CallableInvocation extends DirectInvocation {
  */
 class MethodReferenceSpecifierInvocation extends DirectInvocation {
     
-    private final Function method;
+//    private final Function method;
     private boolean variadic;
     private java.util.List<Parameter> targetParameters;
     private java.util.List<Parameter> sourceParameters;
@@ -1275,7 +1287,7 @@ class MethodReferenceSpecifierInvocation extends DirectInvocation {
             Declaration primaryDeclaration,
             Reference producedReference, Function method, Tree.SpecifierExpression node) {
         super(gen, primary, primaryDeclaration, producedReference, method.getType(), node);
-        this.method = method;
+//        this.method = method;
         setUnboxed(primary.getUnboxed());
         setBoxingStrategy(CodegenUtil.getBoxingStrategy(method));
         this.sourceParameters = method.getFirstParameterList().getParameters();
@@ -1406,7 +1418,7 @@ class NamedArgumentInvocation extends Invocation {
     private final ListBuffer<JCStatement> vars = new ListBuffer<JCStatement>();
     private final Naming.SyntheticName callVarName;
     private final Naming.SyntheticName varBaseName;
-    private final Set<String> argNames = new HashSet<String>();
+//    private final Set<String> argNames = new HashSet<String>();
     private final TreeMap<Integer, Naming.SyntheticName> argsNamesByIndex = new TreeMap<Integer, Naming.SyntheticName>();
     private final TreeMap<Integer, ExpressionAndType> argsAndTypes = new TreeMap<Integer, ExpressionAndType>();
     private final Set<Parameter> bound = new HashSet<Parameter>();
@@ -1427,7 +1439,7 @@ class NamedArgumentInvocation extends Invocation {
     @Override
     protected void addReifiedArguments(ListBuffer<ExpressionAndType> result) {
         Reference ref = gen.resolveAliasesForReifiedTypeArguments(producedReference);
-        if(!gen.supportsReified(ref.getDeclaration()))
+        if(!AbstractTransformer.supportsReified(ref.getDeclaration()))
             return;
         int tpCount = gen.getTypeParameters(ref).size();
         for(int tpIndex = 0;tpIndex<tpCount;tpIndex++){
@@ -1490,7 +1502,7 @@ class NamedArgumentInvocation extends Invocation {
         // FIXME: this is suspisciously similar to AbstractTransformer.makeIterable(java.util.List<Tree.PositionalArgument> list, Type seqElemType)
         // and possibly needs to be merged
         Parameter parameter = sequencedArgument.getParameter();
-        Type parameterType = parameterType(parameter, parameter.getType(), gen.TP_TO_BOUND);
+        Type parameterType = parameterType(parameter, parameter.getType(), AbstractTransformer.TP_TO_BOUND);
         // find out the individual type, we use the argument type for the value, and the param type for the temp variable
         gen.at(sequencedArgument);
         Type tupleType = AnalyzerUtil.getTupleType(sequencedArgument.getPositionalArguments(), gen.typeFact(), false);
@@ -1540,7 +1552,7 @@ class NamedArgumentInvocation extends Invocation {
         case SELF:
             break;
         case STATIC:
-            if (param.getDeclaration().isStaticallyImportable()) {
+            if (param.getDeclaration().isStatic()) {
                 thisExpr = gen.makeStaticQualifier(param.getDeclaration()); 
             }
             break;
@@ -1653,7 +1665,7 @@ class NamedArgumentInvocation extends Invocation {
             Parameter declaredParam, Naming.SyntheticName argName) {
         ListBuffer<JCStatement> statements;
         Tree.Expression expr = specifiedArg.getSpecifierExpression().getExpression();
-        Type type = parameterType(declaredParam, expr.getTypeModel(), gen.TP_TO_BOUND);
+        Type type = parameterType(declaredParam, expr.getTypeModel(), AbstractTransformer.TP_TO_BOUND);
         final BoxingStrategy boxType = getNamedParameterBoxingStrategy(declaredParam);
         int jtFlags = 0;
         int exprFlags = 0;
@@ -1696,11 +1708,11 @@ class NamedArgumentInvocation extends Invocation {
         boolean prevSyntheticClassBody = gen.expressionGen().withinSyntheticClassBody(Decl.isMpl(model) || gen.expressionGen().isWithinSyntheticClassBody()); 
         try {
             gen.expressionGen().withinSyntheticClassBody(true);
-            gen.statementGen().noExpressionlessReturn = gen.isAnything(model.getType());
+            gen.statementGen().noExpressionlessReturn = AbstractTransformer.isAnything(model.getType());
             if (methodArg.getBlock() != null) {
                 body = gen.statementGen().transformBlock(methodArg.getBlock());
                 if (!methodArg.getBlock().getDefinitelyReturns()) {
-                    if (gen.isAnything(model.getType())) {
+                    if (AbstractTransformer.isAnything(model.getType())) {
                         body = body.append(gen.make().Return(gen.makeNull()));
                     } else {
                         body = body.append(gen.make().Return(gen.makeErroneous(methodArg.getBlock(), "compiler bug: non-void method does not definitely return")));
@@ -1802,7 +1814,7 @@ class NamedArgumentInvocation extends Invocation {
         if (getNamedParameterBoxingStrategy(param) == BoxingStrategy.BOXED) {
             flags |= JT_TYPE_ARGUMENT;
         }
-        Type type = gen.getTypeForParameter(param, producedReference, gen.TP_TO_BOUND);
+        Type type = gen.getTypeForParameter(param, producedReference, AbstractTransformer.TP_TO_BOUND);
         Naming.SyntheticName argName = argName(param);
         JCExpression typeExpr = gen.makeJavaType(type, flags);
         JCVariableDecl varDecl = gen.makeVar(argName, typeExpr, argExpr);
@@ -1835,6 +1847,9 @@ class NamedArgumentInvocation extends Invocation {
                             && gen.isJavaArray(((Class)getPrimaryDeclaration()).getType())){
                         // default values are hard-coded to Java default values, and are actually ignored
                         continue;
+                    }else if(gen.typeFact().getExceptionDeclaration().equals(getPrimaryDeclaration())){
+                        // erasure means there's no default value method, but we know it's null
+                        argExpr = gen.makeNull();
                     }else if(getQmePrimary() != null 
                              && gen.isJavaArray(getQmePrimary().getTypeModel())){
                         // we support array methods with optional parameters
@@ -1888,22 +1903,24 @@ class NamedArgumentInvocation extends Invocation {
         Reference target = ((Tree.MemberOrTypeExpression)getPrimary()).getTarget();
         if (getPrimary() instanceof Tree.BaseMemberExpression
                 && !gen.expressionGen().isWithinSyntheticClassBody()) {
-            if (Decl.withinClassOrInterface(getPrimaryDeclaration())) {
+            Declaration primaryDec = getPrimaryDeclaration();
+            if (primaryDec.isClassOrInterfaceMember()) {
                 // a member method
                 thisType = gen.makeJavaType(target.getQualifyingType(), 
-                        JT_NO_PRIMITIVES | (getPrimaryDeclaration().isInterfaceMember() && !getPrimaryDeclaration().isShared() 
+                        JT_NO_PRIMITIVES 
+                        | (primaryDec.isInterfaceMember() && !primaryDec.isShared() 
                                 ? JT_COMPANION : 0));
-                TypeDeclaration outer = Decl.getOuterScopeOfMemberInvocation((StaticMemberOrTypeExpression) getPrimary(), getPrimaryDeclaration());
+                TypeDeclaration outer = Decl.getOuterScopeOfMemberInvocation((StaticMemberOrTypeExpression) getPrimary(), primaryDec);
                 if (outer instanceof Interface
-                        && getPrimaryDeclaration().isShared()) {
+                        && primaryDec.isShared()) {
                     defaultedParameterInstance = gen.naming.makeQuotedThis();
                 } else {
-                    defaultedParameterInstance = gen.naming.makeQualifiedThis(gen.makeJavaType(((TypeDeclaration)outer).getType(), JT_NO_PRIMITIVES | (getPrimaryDeclaration().isInterfaceMember() && !getPrimaryDeclaration().isShared() ? JT_COMPANION : 0)));
+                    defaultedParameterInstance = gen.naming.makeQualifiedThis(gen.makeJavaType(((TypeDeclaration)outer).getType(), JT_NO_PRIMITIVES | (primaryDec.isInterfaceMember() && !primaryDec.isShared() ? JT_COMPANION : 0)));
                 }
             } else {
                 // a local or toplevel function
-                thisType = gen.naming.makeName((TypedDeclaration)getPrimaryDeclaration(), Naming.NA_WRAPPER);
-                defaultedParameterInstance = gen.naming.makeName((TypedDeclaration)getPrimaryDeclaration(), Naming.NA_MEMBER);
+                thisType = gen.naming.makeName((TypedDeclaration)primaryDec, Naming.NA_WRAPPER);
+                defaultedParameterInstance = gen.naming.makeName((TypedDeclaration)primaryDec, Naming.NA_MEMBER);
             }
         } else if (getPrimary() instanceof Tree.BaseTypeExpression
                 || getPrimary() instanceof Tree.QualifiedTypeExpression) {

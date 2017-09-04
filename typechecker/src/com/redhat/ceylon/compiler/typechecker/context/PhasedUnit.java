@@ -9,6 +9,7 @@ import java.util.EnumSet;
 import java.util.List;
 
 import org.antlr.runtime.CommonToken;
+import org.antlr.runtime.Token;
 
 import com.redhat.ceylon.compiler.typechecker.analyzer.AliasVisitor;
 import com.redhat.ceylon.compiler.typechecker.analyzer.AnnotationVisitor;
@@ -72,7 +73,7 @@ public class PhasedUnit  implements Visitor.ExceptionHandler {
     private WeakReference<ModuleSourceMapper> moduleSourceMapperRef;
     private final String pathRelativeToSrcDir;
     private VirtualFile unitFile;
-    private List<CommonToken> tokens;
+    private List<? extends Token> tokens;
     private ModuleVisitor moduleVisitor;
     private Tree.ModuleDescriptor moduleDescriptor;
     private VirtualFile srcDir;
@@ -100,7 +101,7 @@ public class PhasedUnit  implements Visitor.ExceptionHandler {
             ModuleManager moduleManager, 
             ModuleSourceMapper moduleManagerUtil, 
             Context context, 
-            List<CommonToken> tokenStream) {
+            List<? extends Token> tokenStream) {
         this.rootNode = rootNode;
         this.pkg = p;
         this.unitFile = unitFile;
@@ -455,7 +456,7 @@ public class PhasedUnit  implements Visitor.ExceptionHandler {
     }
 
     public synchronized void analyseUsage() {
-        if (! usageAnalyzed) {
+        if (!usageAnalyzed) {
             ReferenceCounter rc = new ReferenceCounter();
             rootNode.visit(rc.setExceptionHandler(this));
             rootNode.visit(new UsageVisitor(rc).setExceptionHandler(this));
@@ -516,8 +517,9 @@ public class PhasedUnit  implements Visitor.ExceptionHandler {
         return rootNode;
     }
 
-    public List<CommonToken> getTokens() {
-        return tokens;
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+	public List<CommonToken> getTokens() {
+        return (List) tokens;
     }
 
     public boolean isScanningDeclarations() {

@@ -19,6 +19,7 @@ import org.xml.sax.SAXException;
 
 import com.redhat.ceylon.cmr.api.ModuleDependencyInfo;
 import com.redhat.ceylon.cmr.api.ModuleInfo;
+import com.redhat.ceylon.cmr.impl.MavenRepository;
 import com.redhat.ceylon.common.Backends;
 import com.redhat.ceylon.model.cmr.ModuleScope;
 
@@ -73,6 +74,7 @@ public class MavenUtils {
         }
         doc.getDocumentElement().normalize();
         Element root = doc.getDocumentElement();
+        
         String modGroupId = getText(root, "groupId");
         // can be null, inherited from parent
         if(modGroupId == null){
@@ -80,8 +82,19 @@ public class MavenUtils {
             if(parent != null)
                 modGroupId = getText(parent, "groupId");
         }
+        
         String modArtifactId = getText(root, "artifactId");
+        
+        String classifier = getText(root, "classifier");
+        
         String modVersion = getText(root, "version");
+        // can be null, inherited from parent
+        if(modVersion == null){
+            Element parent = getFirstElement(root, "parent");
+            if(parent != null)
+                modVersion = getText(parent, "version");
+        }
+        
         String modName = modGroupId + ":" + modArtifactId;
         if(name != null && !name.equals(modName))
             return null;
@@ -96,6 +109,7 @@ public class MavenUtils {
                     Element dep = (Element) depList.item(i);
                     String depGroupId = getText(dep, "groupId");
                     String depArtifactId = getText(dep, "artifactId");
+                    String depClassifier = getText(dep, "classifier");
                     String depVersion = getText(dep, "version");
                     String depScope = getText(dep, "scope");
                     String depOptional = getText(dep, "optional");
@@ -113,12 +127,13 @@ public class MavenUtils {
                     else
                         scope = ModuleScope.COMPILE;
 
-                    ret.add(new ModuleDependencyInfo("maven", depGroupId+":"+depArtifactId, depVersion, 
-                            "true".equals(depOptional), false, Backends.JAVA, scope));
+                    ret.add(new ModuleDependencyInfo(MavenRepository.NAMESPACE, 
+                            moduleName(depGroupId, depArtifactId, depClassifier), 
+                            depVersion, "true".equals(depOptional), false, Backends.JAVA, scope));
                 }
             }
         }
-        return new ModuleInfo(modName, modVersion, modGroupId, modArtifactId, null, ret);
+        return new ModuleInfo(MavenRepository.NAMESPACE, modName, modVersion, modGroupId, modArtifactId, classifier, null, ret);
     }
 
     static String getText(Element element, String childName){
@@ -150,5 +165,11 @@ public class MavenUtils {
                 builder.append(desc);
             }
         }
+    }
+
+    public static String moduleName(String groupId, String artifactId, String classifier) {
+        return classifier==null || classifier.isEmpty() ? 
+                groupId+":"+artifactId : 
+                groupId+":"+artifactId+":"+classifier;
     }
 }

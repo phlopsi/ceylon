@@ -48,9 +48,9 @@
 tagged("Collections")
 shared final serializable native 
 class Array<Element>
-        satisfies SearchableList<Element> &
-                  Ranged<Integer,Element,Array<Element>> &
-                  IndexedCorrespondenceMutator<Element> {
+        satisfies SearchableList<Element> 
+                & Ranged<Integer,Element,Array<Element>> 
+                & IndexedCorrespondenceMutator<Element> {
     
     "Create an array with the given [[elements]]."
     shared native new ({Element*} elements) {}
@@ -59,9 +59,9 @@ class Array<Element>
      every index with the given [[element]]. The specified 
      `size` must be no larger than [[runtime.maxArraySize]].
      If `size<=0`, the new array will have no elements."
-    throws (`class AssertionError`, 
+    throws (class AssertionError, 
         "if `size>runtime.maxArraySize`")
-    see (`value runtime.maxArraySize`)
+    see (value runtime.maxArraySize)
     since("1.2.0")
     shared native new ofSize(
             "The size of the resulting array. If the size is 
@@ -110,7 +110,7 @@ class Array<Element>
     
     "Replace the existing element at the specified [[index]] 
      with the given [[element]]."
-    throws (`class AssertionError`,
+    throws (class AssertionError,
         "if the given index is out of bounds, that is, if 
          `index<0` or if `index>lastIndex`")
     shared actual native 
@@ -135,7 +135,7 @@ class Array<Element>
      
      If the given `length` is not strictly positive, no
      elements are copied."
-    throws (`class AssertionError`, 
+    throws (class AssertionError, 
         "if the arguments do not identify meaningful ranges 
          within the two arrays:
          
@@ -219,7 +219,7 @@ class Array<Element>
      two given indices are identical, no change is made to 
      the array. The array always contains the same elements
      before and after this operation."
-    throws (`class AssertionError`,
+    throws (class AssertionError,
         "if either of the given indices is out of bounds") 
     since("1.2.0")
     shared native
@@ -241,7 +241,7 @@ class Array<Element>
      indices are identical, no change is made to the array. 
      The array always contains the same elements before and 
      after this operation."
-    throws (`class AssertionError`,
+    throws (class AssertionError,
         "if either of the given indices is out of bounds") 
     since("1.2.0")
     shared native
@@ -279,7 +279,7 @@ class Array<Element>
      sequence. This operation has no side-effect, and does
      not modify the array."
     shared actual native 
-    Element[] sort(
+    [Element+]|[] sort(
         "A comparison function that compares pairs of
          elements of this array."
         Comparison comparing(Element x, Element y));

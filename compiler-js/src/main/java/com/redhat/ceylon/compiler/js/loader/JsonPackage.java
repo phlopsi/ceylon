@@ -134,15 +134,7 @@ public class JsonPackage extends LazyPackage {
                     int bits = (int)model.remove("$pkg-pa");
                     setShared(hasAnnotationBit(bits, "shared"));
                 }
-                @SuppressWarnings("unchecked")
-                Object pkgAnns = model.remove("$pkg-anns");
-                if (pkgAnns instanceof List) {
-                    JsonPackage.setNewAnnotations(getAnnotations(), (List<Map<String,List<String>>>)pkgAnns);
-                } else if (pkgAnns instanceof Map) {
-                    JsonPackage.setOldAnnotations(getAnnotations(), (Map<String,List<String>>)pkgAnns);
-                } else if (pkgAnns != null) {
-                    throw new IllegalArgumentException("Annotations should be a List (new format) or a Map (old format)");
-                }
+                setPackageAnnotations(model.remove("$pkg-anns"));
             }
 
             // This was part of loadDeclarations() which is now being called lazily, but
@@ -155,7 +147,19 @@ public class JsonPackage extends LazyPackage {
         }
 
         super.setModule(module);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void setPackageAnnotations(Object pkgAnns) {
+        if (pkgAnns instanceof List) {
+            JsonPackage.setNewAnnotations(getAnnotations(), (List<Map<String,List<String>>>)pkgAnns);
+        } else if (pkgAnns instanceof Map) {
+            JsonPackage.setOldAnnotations(getAnnotations(), (Map<String,List<String>>)pkgAnns);
+        } else if (pkgAnns != null) {
+            throw new IllegalArgumentException("Annotations should be a List (new format) or a Map (old format)");
+        }
     };
+    
     Map<String,Object> getModel() { return model; }
 
     private void loadDeclarations() {
@@ -937,7 +941,7 @@ public class JsonPackage extends LazyPackage {
                 if (container instanceof Constructor) {
                     containerTypeParameters = ((Generic)container.getContainer()).getTypeParameters();
                 } else if (container instanceof Generic) {
-                    containerTypeParameters = ((Generic)container).getTypeParameters();
+                    containerTypeParameters = container.getTypeParameters();
                 } else {
                     containerTypeParameters = null;
                 }
@@ -1115,32 +1119,30 @@ public class JsonPackage extends LazyPackage {
         HashMap<TypeParameter,SiteVariance> variances = null;
         Declaration d = td;
         while (d != null) {
-            if (d instanceof Generic) {
-                for (TypeParameter tparm : ((Generic)d).getTypeParameters()) {
-                    Map<String,Object> targMap = targs.get(partiallyQualifiedName(d) + "." + tparm.getName());
-                    if (targMap == null) {
-                        //TODO error I guess
-                        continue;
-                    }
-                    if (targMap.containsKey(KEY_PACKAGE) || targMap.containsKey(KEY_TYPES)) {
-                        //Substitute for proper type
-                        final Type _pt = getTypeFromJson(targMap, container, typeParams);
-                        concretes.put(tparm, _pt);
-                    } else if (targMap.containsKey(KEY_NAME) && typeParams != null) {
-                        //Look for type parameter with same name
-                        for (TypeParameter typeParam : typeParams) {
-                            if (typeParam.getName().equals(targMap.get(KEY_NAME))) {
-                                concretes.put(tparm, typeParam.getType());
-                            }
+            for (TypeParameter tparm : d.getTypeParameters()) {
+                Map<String,Object> targMap = targs.get(partiallyQualifiedName(d) + "." + tparm.getName());
+                if (targMap == null) {
+                    //TODO error I guess
+                    continue;
+                }
+                if (targMap.containsKey(KEY_PACKAGE) || targMap.containsKey(KEY_TYPES)) {
+                    //Substitute for proper type
+                    final Type _pt = getTypeFromJson(targMap, container, typeParams);
+                    concretes.put(tparm, _pt);
+                } else if (targMap.containsKey(KEY_NAME) && typeParams != null) {
+                    //Look for type parameter with same name
+                    for (TypeParameter typeParam : typeParams) {
+                        if (typeParam.getName().equals(targMap.get(KEY_NAME))) {
+                            concretes.put(tparm, typeParam.getType());
                         }
                     }
-                    Integer usv = (Integer)targMap.get(KEY_US_VARIANCE);
-                    if (usv != null) {
-                        if (variances == null) {
-                            variances = new HashMap<>();
-                        }
-                        variances.put(tparm, SiteVariance.values()[usv]);
+                }
+                Integer usv = (Integer)targMap.get(KEY_US_VARIANCE);
+                if (usv != null) {
+                    if (variances == null) {
+                        variances = new HashMap<>();
                     }
+                    variances.put(tparm, SiteVariance.values()[usv]);
                 }
             }
             d = ModelUtil.getContainingDeclaration(d);
@@ -1238,7 +1240,14 @@ public class JsonPackage extends LazyPackage {
         } else {
             throw new IllegalArgumentException("Annotations should be a List (new format) or a Map (old format)");
         }
+        
+        for (Annotation a: d.getAnnotations()) {
+            if (a.getName().equals("restricted") && !a.getPositionalArguments().isEmpty()) {
+                d.setRestrictions(a.getPositionalArguments());
+            }
+        }
     }
+    
     static void setNewAnnotations(List<Annotation> existing, List<Map<String,List<String>>> anns) {
         for (Map<String, List<String>> a : anns) {
             String name = a.keySet().iterator().next();

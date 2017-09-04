@@ -71,7 +71,7 @@ public abstract class AbstractRepository implements CmrRepository {
         final List<String> tokens = new ArrayList<String>();
         tokens.addAll(Arrays.asList(name.split("\\.")));
         final String version = context.getVersion();
-        if (RepositoryManager.DEFAULT_MODULE.equals(name) == false && version != null)
+        if (!RepositoryManager.DEFAULT_MODULE.equals(name) && version != null)
             tokens.add(version); // add version
         return tokens;
     }
@@ -750,6 +750,9 @@ public abstract class AbstractRepository implements CmrRepository {
                     }
                     if (mvd2.getArtifactId() != null) {
                         mvd.setArtifactId(mvd2.getArtifactId());
+                    }
+                    if (mvd2.getLabel() != null) {
+                        mvd.setLabel(mvd2.getLabel());
                     }
                     if (mvd2.getDoc() != null) {
                         mvd.setDoc(mvd2.getDoc());

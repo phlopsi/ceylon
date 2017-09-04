@@ -22,6 +22,8 @@ import com.redhat.ceylon.model.typechecker.model.ClassOrInterface;
 import com.redhat.ceylon.model.typechecker.model.ConditionScope;
 import com.redhat.ceylon.model.typechecker.model.Declaration;
 import com.redhat.ceylon.model.typechecker.model.ModelUtil;
+import com.redhat.ceylon.model.typechecker.model.Scope;
+import com.redhat.ceylon.model.typechecker.model.Type;
 import com.redhat.ceylon.model.typechecker.model.Value;
 
 /** This component is used by the main JS visitor to generate code for conditions.
@@ -52,10 +54,11 @@ public class ConditionGenerator {
             Tree.Variable variable = null;
             Tree.Destructure destruct = null;
             if (cond instanceof ExistsOrNonemptyCondition) {
-                if (((ExistsOrNonemptyCondition) cond).getVariable() instanceof Tree.Variable) {
-                    variable = (Tree.Variable)((ExistsOrNonemptyCondition) cond).getVariable();
-                } else if (((ExistsOrNonemptyCondition) cond).getVariable() instanceof Tree.Destructure) {
-                    destruct = (Tree.Destructure)((ExistsOrNonemptyCondition) cond).getVariable();
+                ExistsOrNonemptyCondition enc = (ExistsOrNonemptyCondition) cond;
+                if (enc.getVariable() instanceof Tree.Variable) {
+                    variable = (Tree.Variable)enc.getVariable();
+                } else if (enc.getVariable() instanceof Tree.Destructure) {
+                    destruct = (Tree.Destructure)enc.getVariable();
                 }
             } else if (cond instanceof IsCondition) {
                 variable = ((IsCondition) cond).getVariable();
@@ -83,7 +86,7 @@ public class ConditionGenerator {
                         gen.out(",");
                     }
                     gen.out(varName);
-                    directAccess.add(variable.getDeclarationModel());
+                    directAccess.add(vdecl);
                 }
                 vars.add(new VarHolder(variable, variableRHS, varName, member));
             } else if (destruct != null) {
@@ -198,7 +201,8 @@ public class ConditionGenerator {
     private void specialConditionCheck(Condition condition, Tree.Term variableRHS, String varName,
                                        final boolean forAssert) {
         if (condition instanceof ExistsOrNonemptyCondition) {
-            if (((ExistsOrNonemptyCondition) condition).getNot()) {
+            ExistsOrNonemptyCondition enc = (ExistsOrNonemptyCondition) condition;
+            if (enc.getNot()) {
                 gen.out("!");
             }
             if (condition instanceof Tree.NonemptyCondition) {
@@ -209,9 +213,10 @@ public class ConditionGenerator {
             specialConditionRHS(variableRHS, varName);
             gen.out(")");
         } else {
-            Tree.Type type = ((IsCondition) condition).getType();
+            IsCondition ic = (IsCondition) condition;
+            Tree.Type type = ic.getType();
             gen.generateIsOfType(variableRHS, null, type.getTypeModel(),
-                    varName, ((IsCondition)condition).getNot(), forAssert);
+                    varName, ic.getNot(), forAssert);
         }
     }
 
@@ -257,7 +262,7 @@ public class ConditionGenerator {
             }
             gen.out("else");
             gen.encloseBlockInFunction(anoserque.getBlock(), true,
-                    elseDec != null && elseDec.isCaptured() ?
+                    elseDec != null && elseDec.isJsCaptured() ?
                             Collections.singleton(elseDec) : null);
             if (elseDec != null) {
                 directAccess.remove(elseDec);
@@ -449,7 +454,17 @@ public class ConditionGenerator {
         } else if (item instanceof MatchCase) {
             final boolean isNull = switchTerm.getTypeModel().covers(switchTerm.getUnit().getNullType());
             boolean first = true;
-            for (Expression exp : ((MatchCase)item).getExpressionList().getExpressions()) {
+            MatchCase matchCaseItem = (MatchCase) item;
+            Tree.MatchList matchList = matchCaseItem.getExpressionList();
+            if (!matchList.getTypes().isEmpty()) {
+                first = false;
+                List<Type> union = new ArrayList<Type>();
+                for (Tree.Type type: matchList.getTypes()) {
+                   ModelUtil.addToUnion(union, type.getTypeModel());
+                }
+                gen.generateIsOfType(item, expvar, ModelUtil.union(union, matchList.getUnit()), null, false, false);
+            }
+            for (Expression exp : matchList.getExpressions()) {
                 if (!first) gen.out(" || ");
                 final Tree.Term term = exp.getTerm();
                 if (term instanceof Tree.StringLiteral || term instanceof Tree.NaturalLiteral) {
@@ -485,6 +500,12 @@ public class ConditionGenerator {
                 }
                 first = false;
             }
+            caseVar = matchCaseItem.getVariable();
+            if (caseVar != null) {
+                caseDec = caseVar.getDeclarationModel();
+                directAccess.add(caseDec);
+                names.forceName(caseDec, expvar);
+            }
         } else {
             cc.addUnexpectedError("support for case of type " + cc.getClass().getSimpleName() + " not yet implemented", Backend.JavaScript);
         }
@@ -495,7 +516,7 @@ public class ConditionGenerator {
             gen.out(";");
         } else {
             gen.out(" ");
-            Set<Value> cap = caseDec != null && caseDec.isCaptured() ?
+            Set<Value> cap = caseDec != null && caseDec.isJsCaptured() ?
                     Collections.singleton(caseDec) : null;
             gen.encloseBlockInFunction(cc.getBlock(), true, cap);
         }
@@ -556,21 +577,27 @@ public class ConditionGenerator {
         Set<Tree.Variable> vars;
         Set<Value> captured;
         final boolean member;
-        private VarHolder(Tree.Statement st, Tree.Term rhs, String varName, boolean member) {
-            if (st instanceof Tree.Variable) {
-                var = (Tree.Variable)st;
+        private VarHolder(Tree.Variable v, Tree.Term rhs, String varName, boolean member) {
+            this(v, null, v.getScope(), rhs, varName, member);
+        }
+        private VarHolder(Tree.Destructure d, Tree.Term rhs, String varName, boolean member) {
+            this(null, d, d.getScope(), rhs, varName, member);
+        }
+        private VarHolder(Tree.Variable v, Tree.Destructure d, Scope scope, Tree.Term rhs, String varName, boolean member) {
+            if (v!=null) {
+                var = v;
                 destr = null;
-                if (var.getDeclarationModel() != null && var.getDeclarationModel().isCaptured()) {
+                if (var.getDeclarationModel() != null && var.getDeclarationModel().isJsCaptured()) {
                     captured = Collections.singleton(var.getDeclarationModel());
                 }
             } else {
                 var = null;
-                destr = (Tree.Destructure)st;
+                destr = d;
             }
             term = rhs;
-            if (st.getScope() instanceof Tree.Assertion &&
-                    st.getScope().getContainer() instanceof ClassOrInterface) {
-                name = gen.getNames().self((ClassOrInterface)st.getScope().getContainer()) + "." + varName;
+            if (scope instanceof Tree.Assertion &&
+                    scope.getContainer() instanceof ClassOrInterface) {
+                name = gen.getNames().self((ClassOrInterface)scope.getContainer()) + "." + varName;
                 if (var != null) {
                     names.forceName(var.getDeclarationModel(), name);
                 }

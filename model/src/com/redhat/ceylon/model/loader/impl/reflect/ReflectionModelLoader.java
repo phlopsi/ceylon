@@ -42,7 +42,7 @@ public abstract class ReflectionModelLoader extends AbstractModelLoader {
 	                // add a read to the language module since that's where the metadata annotations are
 	                Object otherModule = Java9ModuleUtil.findModule(mod, LANGUAGE_MODULE_NAME);
 	                if(otherModule != null){
-	                    Class<?> moduleClass = ClassLoader.getSystemClassLoader().loadClass("java.lang.reflect.Module");
+	                    Class<?> moduleClass = ClassLoader.getSystemClassLoader().loadClass("java.lang.Module");
 	                    // also add a read to it
 	                    Method addReads = moduleClass.getMethod("addReads", moduleClass);
 	                    addReads.invoke(mod, otherModule);
@@ -90,30 +90,34 @@ public abstract class ReflectionModelLoader extends AbstractModelLoader {
         if(!packageExists(module, packageName))
             return false;
         if(loadDeclarations){
-            for(String file : getPackageList(module, packageName)){
-                // ignore non-class stuff
-                if(!file.toLowerCase().endsWith(".class"))
-                    continue;
-                // turn it into a class name
-                // FIXME: this is terrible
-                String className = file.substring(0, file.length()-6).replace('/', '.');
-                // get the last part
-                int lastDot = className.lastIndexOf('.');
-                String lastPart = lastDot == -1 ? className : className.substring(lastDot+1);
-                int dollar = lastPart.indexOf('$');
-                // if we have a dollar after the first char (where it would be quoting), skip it
-                // because those are local/member/anonymous/impl ones
-                if(dollar > 0)
-                    continue;
-                // skip module/package declarations too (do not strip before checking)
-                if(isModuleOrPackageDescriptorName(lastPart))
-                    continue;
+            // HUGE HACK because JBoss modules hides this package at runtime
+            if(!packageName.startsWith("org.jboss.modules._private.")
+                    && !packageName.equals("org.jboss.modules._private")){
+                for(String file : getPackageList(module, packageName)){
+                    // ignore non-class stuff
+                    if(!file.toLowerCase().endsWith(".class"))
+                        continue;
+                    // turn it into a class name
+                    // FIXME: this is terrible
+                    String className = file.substring(0, file.length()-6).replace('/', '.');
+                    // get the last part
+                    int lastDot = className.lastIndexOf('.');
+                    String lastPart = lastDot == -1 ? className : className.substring(lastDot+1);
+                    int dollar = lastPart.indexOf('$');
+                    // if we have a dollar after the first char (where it would be quoting), skip it
+                    // because those are local/member/anonymous/impl ones
+                    if(dollar > 0)
+                        continue;
+                    // skip module/package declarations too (do not strip before checking)
+                    if(isModuleOrPackageDescriptorName(lastPart))
+                        continue;
 
-                // the logic for lower-cased names should be abstracted somewhere sane
-                if(!isLoadedFromSource(className) 
-                        && (!className.endsWith("_") || !isLoadedFromSource(className.substring(0, className.length()-1)))
-                        && !isTypeHidden(module, className))
-                    convertToDeclaration(module, className, DeclarationType.TYPE);
+                    // the logic for lower-cased names should be abstracted somewhere sane
+                    if(!isLoadedFromSource(className) 
+                            && (!className.endsWith("_") || !isLoadedFromSource(className.substring(0, className.length()-1)))
+                            && !isTypeHidden(module, className))
+                        convertToDeclaration(module, className, DeclarationType.TYPE);
+                }
             }
             if(module.getNameAsString().equals(JAVA_BASE_MODULE_NAME)
                     && packageName.equals("java.lang"))

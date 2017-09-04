@@ -70,6 +70,7 @@ import com.redhat.ceylon.model.typechecker.model.Constructor;
 import com.redhat.ceylon.model.typechecker.model.Declaration;
 import com.redhat.ceylon.model.typechecker.model.Function;
 import com.redhat.ceylon.model.typechecker.model.Interface;
+import com.redhat.ceylon.model.typechecker.model.ModelUtil;
 import com.redhat.ceylon.model.typechecker.model.Reference;
 import com.redhat.ceylon.model.typechecker.model.Scope;
 import com.redhat.ceylon.model.typechecker.model.Type;
@@ -185,7 +186,7 @@ public abstract class BoxingVisitor extends Visitor {
             CodegenUtil.markTypeErased(that);
         }
         if (isRaw(primaryType)
-                && !that.getTypeModel().getDeclaration().getTypeParameters().isEmpty()) {
+                && that.getTypeModel().getDeclaration().isParameterized()) {
             CodegenUtil.markRaw(that);
         }
     }
@@ -248,7 +249,7 @@ public abstract class BoxingVisitor extends Visitor {
         }
         if (that.getPrimary() instanceof Tree.MemberOrTypeExpression
                 && Decl.isConstructor(((Tree.MemberOrTypeExpression)that.getPrimary()).getDeclaration())) {
-            Constructor ctor = Decl.getConstructor(((Tree.MemberOrTypeExpression)that.getPrimary()).getDeclaration());
+            Constructor ctor = ModelUtil.getConstructor(((Tree.MemberOrTypeExpression)that.getPrimary()).getDeclaration());
             if (Decl.isJavaObjectArrayWith(ctor)) {
                 CodegenUtil.markTypeErased(that);
             }
@@ -271,8 +272,7 @@ public abstract class BoxingVisitor extends Visitor {
                     if(term instanceof Tree.NaturalLiteral){
                         Declaration decl = ((Tree.BaseTypeExpression)ce.getPrimary()).getDeclaration();
                         if(decl instanceof Class){
-                            String name = decl.getQualifiedNameString();
-                            if(name.equals("ceylon.language::Byte")){
+                            if(((Class) decl).isByte()){
                                 return true;
                             }
                         }

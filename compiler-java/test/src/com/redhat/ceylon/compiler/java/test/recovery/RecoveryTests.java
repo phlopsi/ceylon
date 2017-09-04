@@ -80,7 +80,7 @@ public class RecoveryTests extends CompilerTests {
             }
         };
         try {
-            run(main, new Class[]{Callable.class}, new Object[]{c}, getDestModuleWithArtifact(main));
+            run(main, false, new Class[]{Callable.class}, new Object[]{c}, getDestModuleWithArtifact(main));
             if (expectedError != null) {
                 Assert.fail("Expected execution to throw " + UnresolvedCompilationError.class.getName());
             }
@@ -112,7 +112,7 @@ public class RecoveryTests extends CompilerTests {
                 return null;
             }
         };
-        run(main, new Class[]{Callable.class}, new Object[]{c}, getDestModuleWithArtifact(main));
+        run(main, false, new Class[]{Callable.class}, new Object[]{c}, getDestModuleWithArtifact(main));
         ArrayList<ceylon.language.Integer> expect = new ArrayList<ceylon.language.Integer>();
         for (int ii : sequence) {
             expect.add(ceylon.language.Integer.instance(ii));
@@ -894,10 +894,7 @@ public class RecoveryTests extends CompilerTests {
 
         TreeSet<CompilerError> actualErrors = c.get(Diagnostic.Kind.ERROR);
         compareErrors(actualErrors,
-                new CompilerError(20, "incorrect syntax: mismatched token 'ERROR' expecting initial-lowercase identifier"),
                 new CompilerError(20, "incorrect syntax: missing ':' operator at '\"1.0.0\"'")
-        // this one is gone for some reason
-//                new CompilerError(21, "incorrect syntax: no viable alternative at token '}'")
         );
         
         File carFile = getModuleArchive("default", null);

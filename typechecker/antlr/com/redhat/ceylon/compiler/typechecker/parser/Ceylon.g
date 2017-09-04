@@ -44,26 +44,26 @@ options {
         return errors;
     }
     int expecting=-1;
-  @Override
-  protected Object getMissingSymbol(IntStream input,
-                    RecognitionException e,
-                    int expectedTokenType,
-                    BitSet follow)
-  {
-    String tokenText;
-    if ( expectedTokenType==Token.EOF ) tokenText = "<missing EOF>";
-    else tokenText = "<missing "+getTokenNames()[expectedTokenType]+">";
-    MissingToken t = new MissingToken(expectedTokenType, tokenText);
-    Token current = ((TokenStream)input).LT(1);
-    if ( current.getType() == Token.EOF ) {
-      current = ((TokenStream)input).LT(-1);
+    
+    @Override
+    protected Object getMissingSymbol(IntStream input,
+            RecognitionException e,
+            int expectedTokenType,
+            BitSet follow) {
+        String tokenText;
+        if ( expectedTokenType==Token.EOF ) tokenText = "<missing EOF>";
+        else tokenText = "<missing "+getTokenNames()[expectedTokenType]+">";
+        MissingToken t = new MissingToken(expectedTokenType, tokenText);
+        Token current = ((TokenStream)input).LT(1);
+        if ( current.getType() == Token.EOF ) {
+            current = ((TokenStream)input).LT(-1);
+        }
+        t.setLine(current.getLine());
+        t.setCharPositionInLine(current.getCharPositionInLine());
+        t.setChannel(DEFAULT_TOKEN_CHANNEL);
+        t.setInputStream(current.getInputStream());
+        return t;
     }
-    t.setLine(current.getLine());
-    t.setCharPositionInLine(current.getCharPositionInLine());
-    t.setChannel(DEFAULT_TOKEN_CHANNEL);
-    t.setInputStream(current.getInputStream());
-    return t;
-  }
 }
 
 @lexer::members {
@@ -149,6 +149,11 @@ moduleDescriptor returns [ModuleDescriptor moduleDescriptor]
           SEGMENT_OP
           s2=STRING_LITERAL
           { $moduleDescriptor.setArtifact(new QuotedLiteral($s2)); }
+          (
+            SEGMENT_OP
+            s3=STRING_LITERAL
+            { $moduleDescriptor.setClassifier(new QuotedLiteral($s3)); }
+          )?
         )?
       )?
       (
@@ -164,13 +169,25 @@ importModuleList returns [ImportModuleList importModuleList]
       { $importModuleList = new ImportModuleList($LBRACE); }
       (
         compilerAnnotations annotations
-        importModule
-        { if ($importModule.importModule!=null)
-              $importModuleList.addImportModule($importModule.importModule); 
-          if ($importModule.importModule!=null)
-              $importModule.importModule.setAnnotationList($annotations.annotationList);
-          if ($importModule.importModule!=null)
-              $importModule.importModule.getCompilerAnnotations().addAll($compilerAnnotations.annotations); }
+        (
+          c=inferredAttributeDeclaration
+          { $c.declaration.setAnnotationList(new AnnotationList(null));
+            $importModuleList.addConstant($c.declaration);
+            if ($c.declaration!=null)
+                $c.declaration.setAnnotationList($annotations.annotationList);
+            if ($c.declaration!=null)
+                $c.declaration.getCompilerAnnotations()
+                    .addAll($compilerAnnotations.annotations); }
+        |
+          importModule
+          { if ($importModule.importModule!=null)
+                $importModuleList.addImportModule($importModule.importModule); 
+            if ($importModule.importModule!=null)
+                $importModule.importModule.setAnnotationList($annotations.annotationList);
+            if ($importModule.importModule!=null)
+                $importModule.importModule.getCompilerAnnotations()
+                    .addAll($compilerAnnotations.annotations); }
+        )
       )*
       RBRACE
       { $importModuleList.setEndToken($RBRACE); }
@@ -210,11 +227,23 @@ importModule returns [ImportModule importModule]
           SEGMENT_OP
           s2=STRING_LITERAL
           { $importModule.setArtifact(new QuotedLiteral($s2)); }
+          (
+            SEGMENT_OP
+            s3=STRING_LITERAL
+            { $importModule.setClassifier(new QuotedLiteral($s3)); }
+          )?
         )?
       )
       (
         s3=STRING_LITERAL
         { $importModule.setVersion(new QuotedLiteral($s3)); 
+          expecting=SEMICOLON; }
+      |
+        c=memberName
+        { BaseMemberExpression bme = new BaseMemberExpression(null);
+          bme.setIdentifier($c.identifier);
+          bme.setTypeArguments(new InferredTypeArguments(null)); 
+          $importModule.setConstantVersion(bme); 
           expecting=SEMICOLON; }
       )?
       SEMICOLON
@@ -247,14 +276,19 @@ importDeclaration returns [Import importDeclaration]
 importElementList returns [ImportMemberOrTypeList importMemberOrTypeList]
     @init { ImportMemberOrTypeList il=null; 
             boolean wildcarded = false; }
-    :
-    LBRACE
-    { il = new ImportMemberOrTypeList($LBRACE);
-      $importMemberOrTypeList = il; }
-    ( 
-      ie1=importElement 
-      { if ($ie1.importMemberOrType!=null)
-            il.addImportMemberOrType($ie1.importMemberOrType); } 
+    : LBRACE
+      { il = new ImportMemberOrTypeList($LBRACE);
+        $importMemberOrTypeList = il; }
+      (
+      (
+        ie1=importElement 
+        { if ($ie1.importMemberOrType!=null)
+              il.addImportMemberOrType($ie1.importMemberOrType); } 
+      | iw1=importWildcard 
+        { wildcarded = true;
+          if ($iw1.importWildcard!=null) 
+              il.setImportWildcard($iw1.importWildcard); }
+      )
       ( 
         c1=COMMA 
         { il.setEndToken($c1); 
@@ -267,20 +301,19 @@ importElementList returns [ImportMemberOrTypeList importMemberOrTypeList]
                 il.addImportMemberOrType($ie2.importMemberOrType);
             if ($ie2.importMemberOrType!=null)
                 il.setEndToken(null); } 
-        | iw=importWildcard
+        | iw2=importWildcard
           { wildcarded = true;
-            if ($iw.importWildcard!=null) 
-                il.setImportWildcard($iw.importWildcard); 
-            if ($iw.importWildcard!=null) 
+            if ($iw2.importWildcard!=null) 
+                il.setImportWildcard($iw2.importWildcard); 
+            if ($iw2.importWildcard!=null) 
                 il.setEndToken(null); } 
         | { displayRecognitionError(getTokenNames(), 
                 new MismatchedTokenException(ELLIPSIS, input)); }
         )
       )*
-    | iw=importWildcard { il.setImportWildcard($iw.importWildcard); }
-    )?
-    RBRACE
-    { il.setEndToken($RBRACE); }
+      )?
+      RBRACE
+      { il.setEndToken($RBRACE); }
     ;
 
 importElement returns [ImportMemberOrType importMemberOrType]
@@ -328,7 +361,7 @@ packagePath returns [ImportPath importPath]
       ( 
         m=MEMBER_OP 
         { $importPath.setEndToken($m); }
-        ((LIDENTIFIER) =>
+        ((LIDENTIFIER|UIDENTIFIER) =>
           pn2=packageName 
           { $importPath.addIdentifier($pn2.identifier); 
             $importPath.setEndToken(null); }
@@ -342,9 +375,7 @@ packageName returns [Identifier identifier]
     : LIDENTIFIER
       { $identifier = new Identifier($LIDENTIFIER);
         $LIDENTIFIER.setType(PIDENTIFIER);}
-    | { displayRecognitionError(getTokenNames(),
-              new MismatchedTokenException(LIDENTIFIER, input), 5001); }
-      UIDENTIFIER
+    | UIDENTIFIER
       { $identifier = new Identifier($UIDENTIFIER);
         $UIDENTIFIER.setType(PIDENTIFIER);}
     ;
@@ -370,7 +401,6 @@ memberNameDeclaration returns [Identifier identifier]
     | { displayRecognitionError(getTokenNames(), 
               new MismatchedTokenException(LIDENTIFIER, input), 5001); }
       typeName { $identifier = $typeName.identifier; }
-      
     ;
 
 typeNameDeclaration returns [Identifier identifier]
@@ -608,16 +638,14 @@ tuplePattern returns [TuplePattern pattern]
     ;
 
 variadicPattern returns [Pattern pattern]
-    : (
-        (compilerAnnotations unionType? PRODUCT_OP) =>
-        variadicVariable
-        { VariablePattern vp = new VariablePattern(null);
-          vp.setVariable($variadicVariable.variable); 
-          $pattern = vp; }
-	    |
-        p=pattern
-        { $pattern = $p.pattern; }
-	    )
+    : (compilerAnnotations unionType? PRODUCT_OP) =>
+      variadicVariable
+      { VariablePattern vp = new VariablePattern(null);
+        vp.setVariable($variadicVariable.variable); 
+        $pattern = vp; }
+	|
+      p=pattern
+      { $pattern = $p.pattern; }
     ;
 
 variadicVariable returns [Variable variable]
@@ -643,8 +671,8 @@ variadicVariable returns [Variable variable]
           $variable.setType(st); }*/
       )
       (
-        memberName
-        { $variable.setIdentifier($memberName.identifier); }
+        memberNameDeclaration
+        { $variable.setIdentifier($memberNameDeclaration.identifier); }
       )?
     ;
 
@@ -661,21 +689,50 @@ keyItemPattern returns [KeyValuePattern pattern]
       )?
     ;
 
-destructure returns [Destructure destructure]
+destructure returns [LetStatement statement]
+    @init { Destructure d = null; }
     : VALUE_MODIFIER
-      { ValueModifier vm = new ValueModifier($VALUE_MODIFIER);
-        $destructure = new Destructure(null);
-        $destructure.setType(vm); }
-      tupleOrEntryPattern
-      { $destructure.setPattern($tupleOrEntryPattern.pattern); }
+      { $statement = new LetStatement($VALUE_MODIFIER);
+        $statement.addUsageWarning(Warning.syntaxDeprecation,
+            "use of 'value' for destructuring is deprecated (change to 'let' and add parentheses)"); }
+      p=tupleOrEntryPattern
+      { d = new Destructure(null);
+        d.setPattern($p.pattern);
+        $statement.addVariable(d); }
       (
-        specifier
-        { $destructure.setSpecifierExpression($specifier.specifierExpression); }
+        s=specifier
+        { d.setSpecifierExpression($s.specifierExpression); }
         { expecting=SEMICOLON; }
       )?
       SEMICOLON
-      { $destructure.setEndToken($SEMICOLON); 
+      { $statement.setEndToken($SEMICOLON); 
         expecting=-1; }
+    ;
+
+destructure2 returns [LetStatement statement]
+    @init { Destructure d = null; }
+    : LET
+      { $statement = new LetStatement($LET); }
+      LPAREN
+      { $statement.setEndToken($LPAREN); }
+      v1=letVariable
+      { if ($v1.statement!=null) {
+          $statement.addVariable($v1.statement); 
+          $statement.setEndToken(null);
+        } }
+      (
+        COMMA
+        { $statement.setEndToken($COMMA); }
+        v2=letVariable
+        { if ($v2.statement!=null) {
+            $statement.addVariable($v2.statement);
+            $statement.setEndToken(null); 
+          } }
+      )*
+      RPAREN
+      { $statement.setEndToken($RPAREN); }
+      SEMICOLON
+      { $statement.setEndToken($SEMICOLON); }
     ;
 
 inferredAttributeDeclaration returns [AnyAttribute declaration]
@@ -1268,15 +1325,23 @@ caseTypes returns [CaseTypes caseTypes]
       )*
     ;
 
-caseType returns [StaticType type, BaseMemberExpression instance]
+caseType returns [StaticType type, StaticMemberOrTypeExpression instance]
     : t=primaryType 
       { $type=$t.type;}
-    | memberName
-      { $instance = new BaseMemberExpression(null);
-        $instance.setIdentifier($memberName.identifier);
-        $instance.setTypeArguments( new InferredTypeArguments(null) ); }
-    /*| classDeclaration
-    | objectDeclaration*/
+    | m1=memberName
+      { BaseMemberExpression bme = new BaseMemberExpression(null);
+        bme.setIdentifier($m1.identifier);
+        bme.setTypeArguments(new InferredTypeArguments(null)); 
+        $instance = bme; }
+    | PACKAGE MEMBER_OP m2=memberName
+      { Package p = new Package($PACKAGE);
+        p.setQualifier(true);
+        QualifiedMemberExpression qme = new QualifiedMemberExpression(null);
+        qme.setPrimary(p);
+        qme.setMemberOperator(new MemberOp($MEMBER_OP));
+        qme.setIdentifier($m2.identifier);
+        qme.setTypeArguments(new InferredTypeArguments(null)); 
+        $instance = qme; }
     ;
 
 abstractedType returns [AbstractedType abstractedType]
@@ -1351,9 +1416,9 @@ parameterDeclaration returns [TypedDeclaration declaration]
       | VALUE_MODIFIER
         { a.setType(new ValueModifier($VALUE_MODIFIER)); }
       )
-      memberName
-      { a.setIdentifier($memberName.identifier);
-        m.setIdentifier($memberName.identifier); }
+      memberNameDeclaration
+      { a.setIdentifier($memberNameDeclaration.identifier);
+        m.setIdentifier($memberNameDeclaration.identifier); }
       (
         (
           specifier
@@ -1397,7 +1462,6 @@ parameterDeclarationOrRefOrPattern returns [Parameter parameter]
 
 parameterDeclarationOrRef returns [Parameter parameter]
     :
-      //(compilerAnnotations annotatedDeclarationStart) => 
       parameter
       { $parameter = $parameter.parameter; }
     | 
@@ -1511,11 +1575,6 @@ anonymousTypeConstraints returns [TypeConstraintList typeConstraintList]
       )+
     ;
 
-annotationListStart
-    : (stringLiteral|annotation) 
-      (LIDENTIFIER|UIDENTIFIER|FUNCTION_MODIFIER|VALUE_MODIFIER|VOID_MODIFIER)
-    ;
-
 destructureStart
     : VALUE_MODIFIER compilerAnnotations 
       (LBRACKET|UIDENTIFIER|VOID_MODIFIER|VALUE_MODIFIER|FUNCTION_MODIFIER|LIDENTIFIER ENTRY_OP)
@@ -1526,13 +1585,13 @@ declarationOrStatement returns [Statement statement]
     : compilerAnnotations
       (
         (destructureStart) => destructure
-        { $statement=$destructure.destructure; }
-      | (annotatedDeclarationStart) => d1=declaration
-        { $statement=$d1.declaration; }
+        { $statement=$destructure.statement; }
+      | destructure2
+        { $statement=$destructure2.statement; }
       | (annotatedAssertionStart) => assertion
         { $statement = $assertion.assertion; }
-      | (annotationListStart) => d2=declaration
-        { $statement=$d2.declaration; }
+      | (annotatedDeclarationStart) => declaration
+        { $statement = $declaration.declaration; }
       | s=statement
         { $statement=$s.statement; }
       )
@@ -1577,8 +1636,13 @@ declaration returns [Declaration declaration]
     ;
 
 annotatedDeclarationStart
-    : stringLiteral? annotation* 
-      ((unambiguousType) => unambiguousType | declarationStart)
+    : 
+      (stringLiteral | annotation) 
+      (LIDENTIFIER | (UIDENTIFIER) => UIDENTIFIER | (unambiguousType) => unambiguousType | declarationStart)
+    |
+      (unambiguousType) => unambiguousType 
+    | 
+      declarationStart
     ;
 
 annotatedAssertionStart
@@ -1648,6 +1712,9 @@ statement returns [Statement statement]
       { $statement = $controlStatement.controlStatement; }
     | expressionOrSpecificationStatement
       { $statement = $expressionOrSpecificationStatement.statement; }
+    | { displayRecognitionError(getTokenNames(), 
+              new MismatchedTokenException(RBRACE, input)); }
+      SEMICOLON
     ;
 
 expressionOrSpecificationStatement returns [Statement statement]
@@ -1879,9 +1946,7 @@ baseReferenceOrParameterized returns [Primary primary]
 baseReference returns [Identifier identifier, 
                        TypeArgumentList typeArgumentList, 
                        boolean isMember]
-    : 
-    (
-      memberReference
+    : memberReference
       { $identifier = $memberReference.identifier;
         $typeArgumentList = $memberReference.typeArgumentList;
         $isMember = true; }
@@ -1889,47 +1954,62 @@ baseReference returns [Identifier identifier,
       { $identifier = $typeReference.identifier;
         $typeArgumentList = $typeReference.typeArgumentList;
         $isMember = false; }
-    )
     ;
 
 primary returns [Primary primary]
     : base
       { $primary=$base.primary; }
-    (
-      qualifiedReference
-      { QualifiedMemberOrTypeExpression qe;
-        if ($qualifiedReference.isMember)
-            qe = new QualifiedMemberExpression(null);
-        else
-            qe = new QualifiedTypeExpression(null);
-        qe.setPrimary($primary);
-        qe.setMemberOperator($qualifiedReference.operator);
-        qe.setIdentifier($qualifiedReference.identifier);
-        if ($qualifiedReference.typeArgumentList!=null)
-            qe.setTypeArguments($qualifiedReference.typeArgumentList);
-        else 
-            qe.setTypeArguments( new InferredTypeArguments(null) );
-        $primary=qe; }
-      | indexOrIndexRange 
-        { $indexOrIndexRange.indexExpression.setPrimary($primary);
-          $primary = $indexOrIndexRange.indexExpression; }
-      | positionalArguments 
-        { InvocationExpression ie = new InvocationExpression(null);
-          ie.setPrimary($primary);
-          ie.setPositionalArgumentList($positionalArguments.positionalArgumentList); 
-          $primary=ie; }
-      | namedArguments
-        { InvocationExpression ie = new InvocationExpression(null);
-          ie.setPrimary($primary);
-          ie.setNamedArgumentList($namedArguments.namedArgumentList);
-          $primary=ie; }
-    )*
+      (
+        qualifiedReference
+        { QualifiedMemberOrTypeExpression qe;
+          if ($qualifiedReference.isMember)
+              qe = new QualifiedMemberExpression(null);
+          else
+              qe = new QualifiedTypeExpression(null);
+          qe.setPrimary($primary);
+          qe.setMemberOperator($qualifiedReference.operator);
+          qe.setIdentifier($qualifiedReference.identifier);
+          if ($qualifiedReference.typeArgumentList!=null)
+              qe.setTypeArguments($qualifiedReference.typeArgumentList);
+          else 
+              qe.setTypeArguments( new InferredTypeArguments(null) );
+          $primary=qe; }
+        | indexOrIndexRange 
+          { $indexOrIndexRange.indexExpression.setPrimary($primary);
+            $primary = $indexOrIndexRange.indexExpression; }
+        | positionalArguments 
+          { InvocationExpression ie = new InvocationExpression(null);
+            ie.setPrimary($primary);
+            ie.setPositionalArgumentList($positionalArguments.positionalArgumentList); 
+            $primary=ie; }
+        | namedArguments
+          { InvocationExpression ie = new InvocationExpression(null);
+            ie.setPrimary($primary);
+            ie.setNamedArgumentList($namedArguments.namedArgumentList);
+            $primary=ie; }
+      )*
+    ;
+
+parameterStart
+    : VOID_MODIFIER LIDENTIFIER
+    | variadicType LIDENTIFIER
+    | DYNAMIC LIDENTIFIER
+    ;
+    
+annotatedParameterStart
+    : 
+      (stringLiteral | annotation) 
+      (LIDENTIFIER | (UIDENTIFIER) => UIDENTIFIER | (unambiguousType) => unambiguousType | parameterStart)
+    |
+      (unambiguousType) => unambiguousType 
+    | 
+      parameterStart
     ;
 
 specifierParametersStart
     : LPAREN 
       ( 
-        compilerAnnotations annotatedDeclarationStart
+        compilerAnnotations annotatedParameterStart
       | RPAREN (SPECIFY | COMPUTE | specifierParametersStart)
       )
     ;
@@ -2036,12 +2116,24 @@ dynamicArguments returns [NamedArgumentList namedArgumentList]
       { $namedArgumentList.setEndToken($RBRACKET); }
     ;
 
-valueCaseList returns [ExpressionList expressionList]
-    : { $expressionList = new ExpressionList(null); }
-      ie1=intersectionExpression 
+valueCase returns [Expression expression, Type type]
+    : (intersectionType (COMMA|UNION_OP|RPAREN)) =>
+      intersectionType 
+      { $type=$intersectionType.type; }
+    | 
+      ie=intersectionExpression 
       { Expression e = new Expression(null);
-        e.setTerm($ie1.term);
-        $expressionList.addExpression(e); }
+        e.setTerm($ie.term);
+        $expression=e; }
+    ;
+
+valueCaseList returns [MatchList expressionList]
+    : { $expressionList = new MatchList(null); }
+      ie1=valueCase 
+      { if ($ie1.expression!=null)
+            $expressionList.addExpression($ie1.expression);
+        if ($ie1.type!=null)
+            $expressionList.addType($ie1.type); }
       ( 
         (
           c=COMMA 
@@ -2053,12 +2145,13 @@ valueCaseList returns [ExpressionList expressionList]
           { $expressionList.setEndToken($u); }
         )
         (
-          ie2=intersectionExpression
-          { if ($ie2.term!=null) {
-                Expression e = new Expression(null);
-                e.setTerm($ie2.term);
-                $expressionList.addExpression(e);
-                $expressionList.setEndToken(null); } }
+          ie2=valueCase
+          { if ($ie2.expression!=null)
+                $expressionList.addExpression($ie2.expression);
+            if ($ie2.type!=null)
+                $expressionList.addType($ie2.type);
+            if ($ie2.expression!=null || $ie2.type!=null)
+                $expressionList.setEndToken(null); }
         | { displayRecognitionError(getTokenNames(), 
               new MismatchedTokenException(LIDENTIFIER, input)); } //TODO: sometimes it should be RPAREN!
         )
@@ -2524,13 +2617,31 @@ spreadArgument returns [SpreadArgument positionalArgument]
         $positionalArgument.setExpression(e); }
     ;
 
+inferrableParameterStart
+    : VOID_MODIFIER LIDENTIFIER
+    | variadicType LIDENTIFIER
+    | DYNAMIC LIDENTIFIER
+    | VALUE_MODIFIER LIDENTIFIER
+    | FUNCTION_MODIFIER LIDENTIFIER
+    ;
+    
+annotatedInferrableParameterStart
+    : 
+      (stringLiteral | annotation) 
+      (LIDENTIFIER | (UIDENTIFIER) => UIDENTIFIER | (unambiguousType) => unambiguousType | inferrableParameterStart)
+    |
+      (unambiguousType) => unambiguousType 
+    | 
+      inferrableParameterStart
+    ;
+
 anonParametersStart
     : typeParameters?
       LPAREN
       ( 
         RPAREN
       | (LIDENTIFIER|LBRACKET) => pattern (COMMA | RPAREN anonParametersStart2)
-      | compilerAnnotations annotatedDeclarationStart 
+      | compilerAnnotations annotatedInferrableParameterStart 
       )
     ;
 
@@ -2541,7 +2652,7 @@ anonParametersStart2
       | (LIDENTIFIER COMMA)*
         (
           (LIDENTIFIER|LBRACKET) => pattern RPAREN anonParametersStart2 
-        | compilerAnnotations annotatedDeclarationStart
+        | compilerAnnotations annotatedInferrableParameterStart
         )
       )
     | COMPUTE
@@ -2549,8 +2660,14 @@ anonParametersStart2
     | TYPE_CONSTRAINT
     ;
 
+anonymousFunctionStart
+    : VOID_MODIFIER
+    | FUNCTION_MODIFIER (SMALLER_OP|LPAREN)
+    | anonParametersStart
+    ;
+    
 functionOrExpression returns [Expression expression]
-    : (FUNCTION_MODIFIER|VOID_MODIFIER|anonParametersStart) =>
+    : (anonymousFunctionStart) =>
       anonymousFunction
       { $expression = new Expression(null);
         $expression.setTerm($anonymousFunction.function); }
@@ -2579,21 +2696,23 @@ patternStart
     ;
 
 letVariable returns [Statement statement]
+    @init { Destructure d=null; Variable v=null; }
     : (
         (patternStart) => pattern
-        { Destructure d = new Destructure(null);
+        { d = new Destructure(null);
           d.setPattern($pattern.pattern);
           $statement = d; }
       |
         variable
-        { $statement=$variable.variable; }
+        { v = $variable.variable;
+          $statement=v; }
       )
       (
         specifier
-        { if ($statement instanceof Destructure)
-            ((Destructure) $statement).setSpecifierExpression($specifier.specifierExpression);
-          else if ($statement instanceof Variable)
-            ((Variable) $statement).setSpecifierExpression($specifier.specifierExpression); }
+        { if (d!=null)
+            d.setSpecifierExpression($specifier.specifierExpression);
+          if (v!=null)
+            v.setSpecifierExpression($specifier.specifierExpression); }
       )?
     ;
 
@@ -2662,13 +2781,29 @@ switchExpression returns [SwitchExpression term]
             }
             if (item instanceof MatchCase) {
               MatchCase mc = (MatchCase) item;
-              ExpressionList el = mc.getExpressionList();
+              MatchList el = mc.getExpressionList();
               if (el!=null) {
                 for (Expression e: el.getExpressions()) {
                   if (!(e.getTerm() instanceof Literal)) {
                     found = true;
                     break;
                   }
+                }
+                for (Type t: el.getTypes()) {
+                  found = true;
+                  Variable v = new Variable(null);
+                  v.setType(new SyntheticVariable(null));
+                  v.setIdentifier(id);
+                  SpecifierExpression se = new SpecifierExpression(null);
+                  Expression e = new Expression(null);
+                  BaseMemberExpression bme = new BaseMemberExpression(null);
+                  bme.setIdentifier(id);
+                  bme.setTypeArguments( new InferredTypeArguments(null) );
+                  e.setTerm(bme);
+                  se.setExpression(e);
+                  v.setSpecifierExpression(se);
+                  mc.setVariable(v);    
+                  break;              
                 }
               }
             }
@@ -2705,8 +2840,10 @@ caseExpressions returns [SwitchCaseList switchCaseList]
     ;
     
 caseExpression returns [CaseClause caseClause]
-    : CASE_CLAUSE 
-      { $caseClause = new CaseClause($CASE_CLAUSE); }
+    : ELSE_CLAUSE?
+      CASE_CLAUSE 
+      { $caseClause = new CaseClause($CASE_CLAUSE); 
+        $caseClause.setOverlapping($ELSE_CLAUSE!=null); }
       caseItemList
       { $caseClause.setCaseItem($caseItemList.item); }
       conditionalBranch
@@ -2961,13 +3098,21 @@ logicalNegationExpression returns [Term term]
       { $term = $notOperator.operator; }
       le=logicalNegationExpression
       { $notOperator.operator.setTerm($le.term); }
-    | equalityExpression
-      { $term = $equalityExpression.term; }
+    | e=expressionOrMeta
+      { $term = $e.term; }
     ;
 
 notOperator returns [NotOp operator]
     : NOT_OP 
       { $operator = new NotOp($NOT_OP); }
+    ;
+
+//TODO: NOT BLESSED BY SPEC!!!
+expressionOrMeta returns [Term term]
+    : modelRef
+      { $term=$modelRef.meta; }
+    | equalityExpression
+      { $term = $equalityExpression.term; }
     ;
 
 equalityExpression returns [Term term]
@@ -3072,17 +3217,13 @@ typeOperator returns [TypeOperatorExpression operator]
     ;
 
 existenceEmptinessExpression returns [Term term]
-    : de1=entryRangeExpression
-      { $term = $de1.term; }
+    : e=entryRangeExpression
+      { $term = $e.term; }
       (
-        eno1=existsNonemptyOperator
-        { $term = $eno1.operator;
-          $eno1.operator.setTerm($de1.term); }
+        eno=existsNonemptyOperator
+        { $term = $eno.operator;
+          $eno.operator.setTerm($e.term); }
       )?
-    /*| eno2=existsNonemptyOperator
-      { $term = $eno2.operator; }
-      de2=rangeIntervalEntryExpression
-      { $eno2.operator.setTerm($de2.term); }*/
     ;
 
 existsNonemptyOperator returns [UnaryOperatorExpression operator]
@@ -3256,13 +3397,29 @@ prefixOperator returns [PrefixOperatorExpression operator]
     ;
 
 postfixIncrementDecrementExpression returns [Term term]
-    : primary 
-      { $term = $primary.primary; } 
+    : valueExpression 
+      { $term = $valueExpression.term; } 
       (
         postfixOperator
         { $postfixOperator.operator.setTerm($term);
           $term = $postfixOperator.operator; }
       )*
+    ;
+
+declarationLiteralStart
+    : (CLASS_DEFINITION|INTERFACE_DEFINITION|NEW|ALIAS|TYPE_CONSTRAINT)
+    | (FUNCTION_MODIFIER|VALUE_MODIFIER|OBJECT_DEFINITION)
+      (PACKAGE MEMBER_OP)?
+      (LIDENTIFIER|UIDENTIFIER)
+    | PACKAGE (~MEMBER_OP)
+    | MODULE
+    ;
+
+valueExpression returns [Term term]
+    : (declarationLiteralStart) => declarationRef
+      { $term = $declarationRef.meta; } 
+    | primary
+      { $term = $primary.primary; } 
     ;
 
 postfixOperator returns [PostfixOperatorExpression operator]
@@ -3736,13 +3893,6 @@ assertMessage returns [AnnotationList annotationList]
       )?
     ;
 
-prefixOperatorStart
-    : DIFFERENCE_OP
-    | INCREMENT_OP 
-    | DECREMENT_OP 
-    | COMPLEMENT_OP
-    ;
-    
 compilerAnnotations returns [List<CompilerAnnotation> annotations]
     : { $annotations = new ArrayList<CompilerAnnotation>(); }
     (
@@ -3752,8 +3902,13 @@ compilerAnnotations returns [List<CompilerAnnotation> annotations]
     ;
     
 compilerAnnotation returns [CompilerAnnotation annotation]
-    : COMPILER_ANNOTATION 
-      { $annotation=new CompilerAnnotation($COMPILER_ANNOTATION); }
+    : (
+        DOLLAR
+        { $annotation=new CompilerAnnotation($DOLLAR); }
+      |
+        AT
+        { $annotation=new CompilerAnnotation($AT); }
+      )
       annotationName 
       { $annotation.setIdentifier($annotationName.identifier); }
       ( 
@@ -3804,7 +3959,14 @@ booleanCondition returns [BooleanCondition condition]
       functionOrExpression
       { $condition.setExpression($functionOrExpression.expression); }
     ;
-    
+
+
+letStart
+    : (patternStart) => patternStart 
+    | compilerAnnotations 
+      (declarationStart|specificationStart)
+    ;
+
 existsCondition returns [ExistsCondition condition]
     : (
         NOT_OP
@@ -3815,7 +3977,7 @@ existsCondition returns [ExistsCondition condition]
       { if ($condition==null)
             $condition = new ExistsCondition($EXISTS); }
       ( 
-        ((patternStart) => patternStart | compilerAnnotations (declarationStart|specificationStart)) =>
+        (letStart) =>
         letVariable 
         { $condition.setVariable($letVariable.statement); }
       | (LIDENTIFIER (RPAREN|COMMA))=> iv1=impliedVariable
@@ -3839,7 +4001,7 @@ nonemptyCondition returns [NonemptyCondition condition]
       { if ($condition==null)
             $condition = new NonemptyCondition($NONEMPTY); }
       ( 
-        ((patternStart) => patternStart | compilerAnnotations (declarationStart|specificationStart)) =>
+        (letStart) =>
         letVariable 
         { $condition.setVariable($letVariable.statement); }
       | (LIDENTIFIER (RPAREN|COMMA))=> iv1=impliedVariable
@@ -3876,8 +4038,8 @@ isCondition returns [IsCondition condition]
 isConditionVariable returns [Variable variable]
     @init { $variable = new Variable(null);
             $variable.setType(new ValueModifier(null));  }
-    : memberName
-      { $variable.setIdentifier($memberName.identifier); }
+    : memberNameDeclaration
+      { $variable.setIdentifier($memberNameDeclaration.identifier); }
       specifier
       { $variable.setSpecifierExpression($specifier.specifierExpression); }
     ;
@@ -4044,13 +4206,29 @@ switchCaseElse returns [SwitchStatement statement]
             }
             if (item instanceof MatchCase) {
               MatchCase mc = (MatchCase) item;
-              ExpressionList el = mc.getExpressionList();
+              MatchList el = mc.getExpressionList();
               if (el!=null) {
                 for (Expression e: el.getExpressions()) {
                   if (!(e.getTerm() instanceof Literal)) {
                     found = true;
                     break;
                   }
+                }
+                for (Type t: el.getTypes()) {
+                  found = true;
+                  Variable v = new Variable(null);
+                  v.setType(new SyntheticVariable(null));
+                  v.setIdentifier(id);
+                  SpecifierExpression se = new SpecifierExpression(null);
+                  Expression e = new Expression(null);
+                  BaseMemberExpression bme = new BaseMemberExpression(null);
+                  bme.setIdentifier(id);
+                  bme.setTypeArguments( new InferredTypeArguments(null) );
+                  e.setTerm(bme);
+                  se.setExpression(e);
+                  v.setSpecifierExpression(se);
+                  mc.setVariable(v);    
+                  break;              
                 }
               }
             }
@@ -4088,9 +4266,13 @@ switchHeader returns [SwitchClause clause]
       { $clause.setEndToken($RPAREN); }
     ;
 
+compilerAnnotationStart
+    : DOLLAR | AT
+    ;
+
 switched returns [Switched switched]
     @init { $switched = new Switched(null); }
-    : ( (COMPILER_ANNOTATION|declarationStart|specificationStart) 
+    : ( (compilerAnnotationStart|declarationStart|specificationStart) 
         => specifiedVariable
         { $switched.setVariable($specifiedVariable.variable); }
       | expression
@@ -4111,8 +4293,10 @@ cases returns [SwitchCaseList switchCaseList]
     ;
     
 caseBlock returns [CaseClause clause]
-    : CASE_CLAUSE 
-      { $clause = new CaseClause($CASE_CLAUSE); }
+    : ELSE_CLAUSE?
+      CASE_CLAUSE 
+      { $clause = new CaseClause($CASE_CLAUSE); 
+        $clause.setOverlapping($ELSE_CLAUSE!=null); }
       caseItemList
       { $clause.setCaseItem($caseItemList.item); }
       block
@@ -4133,7 +4317,7 @@ caseItemList returns [CaseItem item]
     ;
 
 caseItem returns [CaseItem item]
-    : (IS_OP) => isCaseCondition 
+    : (IS_OP|type RPAREN) => isCaseCondition 
       { $item = $isCaseCondition.item; }
     | (SATISFIES) => satisfiesCaseCondition
       { $item = $satisfiesCaseCondition.item; }
@@ -4155,7 +4339,7 @@ matchCaseCondition returns [MatchCase item]
 
 isCaseCondition returns [IsCase item]
     @init { StaticType t = null; } 
-    : IS_OP 
+    : IS_OP?
       { $item = new IsCase($IS_OP); }
       type
       { t = $type.type;
@@ -4334,7 +4518,7 @@ resources returns [ResourceList resources]
 resource returns [Resource resource]
     @init { $resource = new Resource(null); }
     : 
-      (COMPILER_ANNOTATION|declarationStart|specificationStart) => 
+      (compilerAnnotationStart|declarationStart|specificationStart) => 
       specifiedVariable
       { $resource.setVariable($specifiedVariable.variable); }
     | 
@@ -4374,7 +4558,7 @@ var returns [Variable variable]
         VALUE_MODIFIER
         { $variable.setType(new ValueModifier($VALUE_MODIFIER)); }
       )
-      mn1=memberName 
+      mn1=memberNameDeclaration
       { $variable.setIdentifier($mn1.identifier); }
       ( 
         p1=parameters
@@ -4443,90 +4627,74 @@ referencePath returns [SimpleType type]
 
 moduleLiteral returns [ModuleLiteral literal]
  : MODULE
-   { $literal = new ModuleLiteral(null);
-     $literal.setEndToken($MODULE); }
+   { $literal = new ModuleLiteral($MODULE); }
    (
      p1=packagePath
-     { $literal.setImportPath($p1.importPath); 
-       $literal.setEndToken(null); }
+     { $literal.setImportPath($p1.importPath); }
    )?
  ;
 
 packageLiteral returns [PackageLiteral literal]
  : PACKAGE
-   { $literal = new PackageLiteral(null);
-     $literal.setEndToken($PACKAGE); }
+   { $literal = new PackageLiteral($PACKAGE); }
    (
      p2=packagePath
-     { $literal.setImportPath($p2.importPath); 
-       $literal.setEndToken(null); }
+     { $literal.setImportPath($p2.importPath); }
    )?
  ;
 
 classLiteral returns [ClassLiteral literal]
  : CLASS_DEFINITION
-   { $literal = new ClassLiteral(null);
-     $literal.setEndToken($CLASS_DEFINITION); }
+   { $literal = new ClassLiteral($CLASS_DEFINITION); }
    (
      ct=referencePath
-     { $literal.setType($ct.type); 
-       $literal.setEndToken(null); }
+     { $literal.setType($ct.type); }
    )?
  ;
 
 interfaceLiteral returns [InterfaceLiteral literal]
  : INTERFACE_DEFINITION
-   { $literal = new InterfaceLiteral(null);
-     $literal.setEndToken($INTERFACE_DEFINITION); }
+   { $literal = new InterfaceLiteral($INTERFACE_DEFINITION); }
    (
      it=referencePath
-     { $literal.setType($it.type); 
-       $literal.setEndToken(null); }
+     { $literal.setType($it.type); }
    )?
  ;
 
 newLiteral returns [NewLiteral literal]
  : NEW
-   { $literal = new NewLiteral(null);
-     $literal.setEndToken($NEW); }
+   { $literal = new NewLiteral($NEW); }
    (
      nt=referencePath
-     { $literal.setType($nt.type); 
-       $literal.setEndToken(null); }
+     { $literal.setType($nt.type); }
    )?
  ;
 
 aliasLiteral returns [AliasLiteral literal]
  : ALIAS
-   { $literal = new AliasLiteral(null);
-     $literal.setEndToken($ALIAS); }
+   { $literal = new AliasLiteral($ALIAS); }
    (
      at=referencePath
-     { $literal.setType($at.type); 
-       $literal.setEndToken(null); }
+     { $literal.setType($at.type); }
    )?
  ;
 
 typeParameterLiteral returns [TypeParameterLiteral literal]
  : TYPE_CONSTRAINT
-   { $literal = new TypeParameterLiteral(null);
-     $literal.setEndToken($TYPE_CONSTRAINT); }
+   { $literal = new TypeParameterLiteral($TYPE_CONSTRAINT); }
    (
      tt=referencePath
-     { $literal.setType($tt.type); 
-       $literal.setEndToken(null); }
+     { $literal.setType($tt.type); }
    )?
  ;
 
 valueLiteral returns [ValueLiteral literal]
   : (
       VALUE_MODIFIER
-      { $literal = new ValueLiteral(null);
-        $literal.setEndToken($VALUE_MODIFIER); }
+      { $literal = new ValueLiteral($VALUE_MODIFIER); }
     |
       OBJECT_DEFINITION
-      { $literal = new ValueLiteral(null);
-        $literal.setEndToken($OBJECT_DEFINITION);
+      { $literal = new ValueLiteral($OBJECT_DEFINITION);
         $literal.setBroken(true); }
     )
     vt=referencePath
@@ -4535,20 +4703,17 @@ valueLiteral returns [ValueLiteral literal]
         $literal.setType(((QualifiedType)$vt.type).getOuterType());
         $literal.setIdentifier($vt.type.getIdentifier());
         $literal.setTypeArgumentList($vt.type.getTypeArgumentList());
-        $literal.setEndToken(null);
       }
       else if ($vt.type instanceof BaseType) {
         $literal.setIdentifier($vt.type.getIdentifier());
         $literal.setTypeArgumentList($vt.type.getTypeArgumentList());
-        $literal.setEndToken(null);
       }
     }
   ;
 
 functionLiteral returns [FunctionLiteral literal]
   : FUNCTION_MODIFIER
-    { $literal = new FunctionLiteral(null);
-      $literal.setEndToken($FUNCTION_MODIFIER); }
+    { $literal = new FunctionLiteral($FUNCTION_MODIFIER); }
     ft=referencePath
     {
       if ($ft.type instanceof QualifiedType) {
@@ -4556,13 +4721,11 @@ functionLiteral returns [FunctionLiteral literal]
         $literal.setType(qt.getOuterType());
         $literal.setIdentifier(qt.getIdentifier());
         $literal.setTypeArgumentList(qt.getTypeArgumentList());
-        $literal.setEndToken(null);
       }
       else if ($ft.type instanceof BaseType) {
         BaseType bt = (BaseType) $ft.type;
         $literal.setIdentifier(bt.getIdentifier());
         $literal.setTypeArgumentList(bt.getTypeArgumentList());
-        $literal.setEndToken(null);
         $literal.setPackageQualified(bt.getPackageQualified());
       }
     }
@@ -4619,47 +4782,54 @@ modelExpression returns [MetaLiteral meta]
     { $meta=$memberModelExpression.literal; }
   | 
     typeModelExpression
-    { $meta = $typeModelExpression.literal; }
+    { $meta=$typeModelExpression.literal; }
   ;
 
 metaLiteral returns [MetaLiteral meta]
     : d1=BACKTICK
-      { $meta = new TypeLiteral($d1); }
-	    ( moduleLiteral
-	      { $meta=$moduleLiteral.literal; 
-	        $meta.setToken($d1); }
-	    | (PACKAGE (LIDENTIFIER|BACKTICK)) =>
-	      packageLiteral
-	      { $meta=$packageLiteral.literal; 
-	        $meta.setToken($d1); }
-	    | classLiteral
-	      { $meta=$classLiteral.literal; 
-          $meta.setToken($d1); }
-	    | newLiteral
-	      { $meta=$newLiteral.literal; 
-          $meta.setToken($d1); }
-	    | interfaceLiteral
-	      { $meta=$interfaceLiteral.literal; 
-          $meta.setToken($d1); }
-	    | aliasLiteral
-	      { $meta=$aliasLiteral.literal; 
-          $meta.setToken($d1); }
-	    | typeParameterLiteral
-	      { $meta=$typeParameterLiteral.literal; 
-          $meta.setToken($d1); }
-	    | valueLiteral
-	      { $meta=$valueLiteral.literal; 
-          $meta.setToken($d1); }
-	    | functionLiteral
-	      { $meta=$functionLiteral.literal; 
-          $meta.setToken($d1); }
-	    | modelExpression
-	      { $meta=$modelExpression.meta; 
-	        $meta.setToken($d1); }     
-	    )
-      d2=BACKTICK
-      { $meta.setEndToken($d2); }
+    { $meta = new TypeLiteral($d1); }
+    ( declarationRef
+      { $meta=$declarationRef.meta; 
+        $meta.setToken($d1); }
+    | modelExpression
+      { $meta=$modelExpression.meta; 
+        $meta.setToken($d1); }     
+    )
+    d2=BACKTICK
+    { $meta.setEndToken($d2); }
     ;
+
+modelRef returns [MetaLiteral meta]
+    : m=POWER_OP
+      { $meta = new TypeLiteral($m); }
+      modelExpression
+      { if ($modelExpression.meta!=null) {
+          $meta=$modelExpression.meta; 
+          $meta.setToken($m);
+        } }
+    ;
+    
+declarationRef returns [MetaLiteral meta]
+    : moduleLiteral
+      { $meta=$moduleLiteral.literal; }
+    | packageLiteral
+      { $meta=$packageLiteral.literal; }
+    | classLiteral
+      { $meta=$classLiteral.literal; }
+    | newLiteral
+      { $meta=$newLiteral.literal; }
+    | interfaceLiteral
+      { $meta=$interfaceLiteral.literal; }
+    | aliasLiteral
+      { $meta=$aliasLiteral.literal; }
+    | typeParameterLiteral
+      { $meta=$typeParameterLiteral.literal; }
+    | valueLiteral
+      { $meta=$valueLiteral.literal; }
+    | functionLiteral
+      { $meta=$functionLiteral.literal; }
+    ;
+
 
 // Lexer
 
@@ -5182,7 +5352,11 @@ OR_SPECIFY
     :   '||='
     ;
 
-COMPILER_ANNOTATION
+DOLLAR
+    :   '$'
+    ;
+
+AT
     :   '@'
     ;
 
@@ -5207,7 +5381,7 @@ fragment
 IdentifierStart
     :   '_'
     |   Letter
-    ;       
+    ;
 
 fragment
 LIdentifierPrefix

@@ -264,6 +264,9 @@ public class TypeParameter extends TypeDeclaration {
         else if (dec.isAnything()) {
             return true;
         }
+        else if (dec instanceof TypeParameter && equals(dec)) {
+            return true;
+        }
         else {
             List<Type> sts = getSatisfiedTypes();
             for (int i=0, s=sts.size(); i<s; i++) {
@@ -299,7 +302,7 @@ public class TypeParameter extends TypeDeclaration {
         }
         TypeParameter b = (TypeParameter) o;
         return getDeclaration().equalsForCache(b.getDeclaration())
-                && Objects.equals(getName(),b.getName());
+            && Objects.equals(getName(),b.getName());
     }
 
     @Override

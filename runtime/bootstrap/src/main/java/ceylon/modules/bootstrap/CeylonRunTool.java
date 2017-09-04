@@ -32,6 +32,7 @@ import org.jboss.modules.ModuleIdentifier;
 import org.jboss.modules.ModuleLoader;
 
 import com.redhat.ceylon.cmr.api.ModuleQuery;
+import com.redhat.ceylon.cmr.api.ModuleQuery.Type;
 import com.redhat.ceylon.cmr.impl.AssemblyRepositoryBuilder;
 import com.redhat.ceylon.cmr.util.JarUtils;
 import com.redhat.ceylon.common.Constants;
@@ -94,14 +95,19 @@ public class CeylonRunTool extends RepoUsingTool {
     private boolean flatClasspath = DefaultToolOptions.getDefaultFlatClasspath();
     private boolean autoExportMavenDependencies = DefaultToolOptions.getDefaultAutoExportMavenDependencies();
     private boolean upgradeDist = DefaultToolOptions.getLinkWithCurrentDistribution();
-    
     private Map<String,String> extraModules = new HashMap<String,String>();
 
     public CeylonRunTool() {
         super(CeylonMessages.RESOURCE_BUNDLE);
     }
     
-    @Option(longName="flat-classpath")
+    @OptionArgument(argumentName="option")
+    @Description("Passes an option to the underlying ceylon compiler.")
+    public void setCompilerArguments(List<String> compilerArguments) {
+        this.compilerArguments = compilerArguments;
+    }
+    
+    @Option(shortName='F', longName="flat-classpath")
     @Description("Launches the Ceylon module using a flat classpath.")
     public void setFlatClasspath(boolean flatClasspath) {
         this.flatClasspath = flatClasspath;
@@ -116,9 +122,9 @@ public class CeylonRunTool extends RepoUsingTool {
     public void setArgs(List<String> args) {
         this.args = args;
     }
-
-    @OptionArgument
-    @Description("Specifies the path to a Ceylon Assembly file that should be executed")
+    
+    @OptionArgument(shortName='a', argumentName="archive")
+    @Description("Specifies the path to a Ceylon assembly archive that should be executed.")
     public void setAssembly(File assembly) {
         this.assembly = assembly;
     }
@@ -130,7 +136,7 @@ public class CeylonRunTool extends RepoUsingTool {
         this.autoExportMavenDependencies = autoExportMavenDependencies;
     }
 
-    @OptionArgument(longName = "run", argumentName = "toplevel")
+    @OptionArgument(shortName='x', longName = "run", argumentName = "toplevel")
     @Description("Specifies the fully qualified name of a toplevel method or class to run. " +
             "The indicated declaration must be shared by the `module` and have no parameters. " +
             "The format is: `qualified.package.name::classOrMethodName` with `::` acting as separator " +
@@ -139,10 +145,11 @@ public class CeylonRunTool extends RepoUsingTool {
         this.run = run;
     }
 
-    @Option
+    @Option(shortName='c')
     @OptionArgument(argumentName = "flags")
     @Description("Determines if and how compilation should be handled. " +
-            "Allowed flags include: `never`, `once`, `force`, `check`.")
+            "Allowed flags include: `never`, `once`, `force`, `check`. " +
+            "If no flags are specified, defaults to `check`.")
     public void setCompile(String compile) {
         this.compileFlags = compile;
     }
@@ -180,6 +187,11 @@ public class CeylonRunTool extends RepoUsingTool {
     @Override
     protected boolean shouldUpgradeDist() {
         return upgradeDist;
+    }
+
+    @Override
+    protected Type getCompilerType() {
+        return ModuleQuery.Type.JVM;
     }
     
     @Override
@@ -230,10 +242,10 @@ public class CeylonRunTool extends RepoUsingTool {
                         run = mfRun;
                     }
                 } else {
-                    throw new IllegalArgumentException("The Assembly does not have a manifest");
+                    throw new IllegalArgumentException("The assembly archive does not have a manifest");
                 }
             } else {
-                throw new IllegalArgumentException("The file specified by '--assembly' is not a valid Ceylon Assembly");
+                throw new IllegalArgumentException("The file specified by '--assembly' is not a valid Ceylon assembly archive: " + assembly);
             }
         }
         
@@ -295,7 +307,7 @@ public class CeylonRunTool extends RepoUsingTool {
 
         if (run != null) {
             argList.add("-run");
-            argList.add(run);
+            argList.add(prependModuleName(module, run));
         }
 
         if (offline) {
@@ -375,6 +387,19 @@ public class CeylonRunTool extends RepoUsingTool {
             throw new RuntimeException(t);
         }
     }
+
+    private static String prependModuleName(String module, String run) {
+        if (run==null) return null;
+        if (!com.redhat.ceylon.model.typechecker.model.Module.DEFAULT_MODULE_NAME
+                    .equals(module)
+                && !run.contains("::")
+                && !run.contains(".")) {
+            return module + "::" + run;
+        }
+        else {
+            return run;
+        }
+    }
     
     private void startInFlatClasspath(String module, String version) {
         JavaRunnerOptions options = new JavaRunnerOptions();
@@ -389,7 +414,7 @@ public class CeylonRunTool extends RepoUsingTool {
         options.setOffline(offline);
         options.setSystemRepository(systemRepo);
         options.setVerboseCategory(verbose);
-        options.setRun(run);
+        options.setRun(prependModuleName(module, run));
         options.setOverrides(overrides);
         options.setDowngradeDist(!upgradeDist);
         options.setExtraModules(extraModules);

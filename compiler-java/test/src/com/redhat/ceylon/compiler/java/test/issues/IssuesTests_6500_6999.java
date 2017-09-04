@@ -192,6 +192,13 @@ public class IssuesTests_6500_6999 extends CompilerTests {
     }
     
     @Test
+    public void testBug6725() {
+        Assume.assumeTrue("Runs on JDK8", JDKUtils.jdk == JDKUtils.JDK.JDK8
+                || JDKUtils.jdk == JDKUtils.JDK.JDK9);
+        compareWithJavaSource("bug67xx/Bug6725");
+    }
+    
+    @Test
     public void testBug6741() {
         compareWithJavaSource("bug67xx/Bug6741");
         run("com.redhat.ceylon.compiler.java.test.issues.bug67xx.bug6741");
@@ -201,7 +208,20 @@ public class IssuesTests_6500_6999 extends CompilerTests {
     public void testBug6746() {
         compileAndRun("com.redhat.ceylon.compiler.java.test.issues.bug67xx.bug6746", "bug67xx/Bug6746.ceylon");
     }
-    
+
+    @Test
+    public void testBug6782() {
+        compareWithJavaSource("bug67xx/Bug6782");
+    }
+
+    @Test
+    public void testBug6747() {
+        Assume.assumeTrue("Runs on JDK8", JDKUtils.jdk == JDKUtils.JDK.JDK8
+                || JDKUtils.jdk == JDKUtils.JDK.JDK9);
+        compile("bug67xx/Bug6747Java.java");
+        compareWithJavaSource("bug67xx/Bug6747");
+    }
+
     @Test
     public void testBug6769() {
         compileAndRun("com.redhat.ceylon.compiler.java.test.issues.bug67xx.bug6769", "bug67xx/Bug6769.ceylon");
@@ -313,7 +333,17 @@ public class IssuesTests_6500_6999 extends CompilerTests {
         compileAndRun("com.redhat.ceylon.compiler.java.test.issues.bug68xx.bug6855",
                 "bug68xx/Bug6855.ceylon");
     }
-    
+
+    @Test
+    public void testBug6884() throws Throwable {
+        compile(Arrays.asList("-res", "test/src/com/redhat/ceylon/compiler/java/test/issues/bug68xx/bug6884resources"), 
+                "bug68xx/bug6884/test.ceylon",
+                "bug68xx/bug6884resources/com/redhat/ceylon/compiler/java/test/issues/bug68xx/bug6884/test.txt");
+        run("com.redhat.ceylon.compiler.java.test.issues.bug68xx.bug6884.run",
+                true,
+                new ModuleWithArtifact("com.redhat.ceylon.compiler.java.test.issues.bug68xx.bug6884", "1"));
+    }
+
     @Test
     public void testBug6909() throws Throwable {
         compileAndRun("com.redhat.ceylon.compiler.java.test.issues.bug69xx.bug6909",
@@ -338,5 +368,76 @@ public class IssuesTests_6500_6999 extends CompilerTests {
                 new CompilerError(5, "formal member 'hash' of 'Object' not implemented for concrete class 'HelloWorld': 'HelloWorld' neither directly implements nor inherits a concrete implementation of 'hash'")
                 );
         compile(Arrays.asList("-fully-export-maven-dependencies"), "bug69xx/bug6916/Bug6916.ceylon");
+    }
+
+    @Test
+    public void testBug6930() throws Throwable {
+        compile("bug69xx/Bug6930Java.java");
+        compareWithJavaSource("bug69xx/Bug6930");
+    }
+
+    @Test
+    public void testBug6947() throws Throwable {
+        compareWithJavaSource("bug69xx/Bug6947");
+    }
+
+    @Test
+    public void testBug6949() throws Throwable {
+        compareWithJavaSource("bug69xx/Bug6949");
+    }
+
+    @Test
+    public void testBug6957() {
+        compareWithJavaSource("bug69xx/Bug6957");
+    }
+
+    @Test
+    public void testBug6959() throws Throwable {
+        compileAndRun(Arrays.asList("-res", "test/src/com/redhat/ceylon/compiler/java/test/issues/bug69xx/bug6959resources"), 
+                "com.redhat.ceylon.compiler.java.test.issues.bug69xx.bug6959", 
+                "bug69xx/Bug6959.ceylon",
+                "bug69xx/bug6959resources/com/redhat/ceylon/compiler/java/test/issues/bug69xx/bug6959.properties");
+    }
+
+    @Test
+    public void testBug6963() throws Throwable {
+        compile("bug69xx/Bug6963Java.java");
+        compareWithJavaSource("bug69xx/Bug6963");
+    }
+
+    @Test
+    public void testBug6969() throws Throwable {
+        compile("bug69xx/Bug6969.ceylon", "bug69xx/Bug6969Java.java");
+    }
+
+    @Test
+    public void testBug6970() throws Throwable {
+        compile("bug69xx/Bug6970.ceylon", "bug69xx/Bug6970Java.java");
+    }
+
+    @Test
+    public void testBug6971() throws Throwable {
+        compile("bug69xx/Bug6971Java.java");
+        compileAndRun("com.redhat.ceylon.compiler.java.test.issues.bug69xx.bug6971", 
+                "bug69xx/Bug6971.ceylon");
+    }
+
+    @Test
+    public void testBug6974() throws Throwable {
+        compile("bug69xx/Bug6974.ceylon");
+    }
+
+    @Test
+    public void testBug6982() throws Throwable {
+        Assume.assumeTrue("Runs on JDK8", JDKUtils.jdk == JDKUtils.JDK.JDK8
+                || JDKUtils.jdk == JDKUtils.JDK.JDK9);
+        compile("bug69xx/Bug6982Java.java");
+        compileAndRun("com.redhat.ceylon.compiler.java.test.issues.bug69xx.bug6982", 
+                "bug69xx/Bug6982.ceylon");
+    }
+
+    @Test
+    public void testBug6997() throws Throwable {
+        compareWithJavaSource("bug69xx/Bug6997");
     }
 }

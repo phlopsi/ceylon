@@ -7,8 +7,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.antlr.runtime.ANTLRInputStream;
-import org.antlr.runtime.CommonToken;
 import org.antlr.runtime.CommonTokenStream;
+import org.antlr.runtime.Token;
 
 import com.redhat.ceylon.compiler.typechecker.analyzer.ModuleSourceMapper;
 import com.redhat.ceylon.compiler.typechecker.io.VirtualFile;
@@ -124,11 +124,9 @@ public class PhasedUnits extends PhasedUnitMap<PhasedUnit, PhasedUnit> {
             CommonTokenStream tokenStream = new CommonTokenStream(lexer);
             CeylonParser parser = new CeylonParser(tokenStream);
             Tree.CompilationUnit cu = parser.compilationUnit();
-            List<CommonToken> tokens = new ArrayList<CommonToken>(tokenStream.getTokens().size()); 
-            tokens.addAll(tokenStream.getTokens());
             PhasedUnit phasedUnit = new PhasedUnit(file, srcDir, cu, 
                     moduleSourceMapper.getCurrentPackage(), moduleManager, moduleSourceMapper,
-                    context, tokens);
+                    context, new ArrayList<Token>(tokenStream.getTokens()));
             addPhasedUnit(file, phasedUnit);
 
             List<LexError> lexerErrors = lexer.getErrors();

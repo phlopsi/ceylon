@@ -37,6 +37,7 @@ public class DefaultToolOptions {
     public final static String COMPILER_MODULES = "compiler.module";
     public final static String COMPILER_INCLUDE_DEPENDENCIES = "compiler.includedependencies";
     public final static String COMPILER_INCREMENTAL = "compiler.incremental";
+    public final static String COMPILER_ARGUMENTS = "compiler.arguments";
     // JVM-only, needing backward compatibility (only for pre-1.3.0 options)
     public final static String COMPILER_NOOSGI = "compiler.jvm.noosgi";
     public final static String COMPILER_OSGIPROVIDEDBUNDLES = "compiler.jvm.osgiprovidedbundles";
@@ -363,9 +364,26 @@ public class DefaultToolOptions {
         }
     }
 
+    public static List<String> getCompilerArguments() {
+        return getCompilerArguments(CeylonConfig.get());
+    }
+
+    public static List<String> getCompilerArguments(CeylonConfig config) {
+        String[] args = config.getOptionValues(COMPILER_ARGUMENTS);
+        if (args != null) {
+            return Arrays.asList(args);
+        } else {
+            return Collections.emptyList();
+        }
+    }
+
     private static Long getDefaultTarget() {
         String dottedVersion = System.getProperty("java.version");
-        return Long.parseLong(dottedVersion.split("\\.|_|-")[1]);
+        String[] parts = dottedVersion.split("\\.|_|-");
+        long major = Long.parseLong(parts[0]);
+        if(major == 1)
+            return Long.parseLong(parts[1]);
+        return major;
     }
     
     public static long getCompilerTargetVersion() {

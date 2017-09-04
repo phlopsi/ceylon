@@ -177,6 +177,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
     static final String CEYLON_LANGUAGE_NATIVE_ANNOTATION = "ceylon.language.NativeAnnotation$annotation$";
     static final String CEYLON_LANGUAGE_OPTIONAL_ANNOTATION = "ceylon.language.OptionalAnnotation$annotation$";
     static final String CEYLON_LANGUAGE_SERIALIZABLE_ANNOTATION = "ceylon.language.SerializableAnnotation$annotation$";
+    static final String CEYLON_LANGUAGE_RESTRICTED_ANNOTATION = "ceylon.language.RestrictedAnnotation$annotation$";
     
     static final String CEYLON_LANGUAGE_DOC_ANNOTATION = "ceylon.language.DocAnnotation$annotation$";
     static final String CEYLON_LANGUAGE_THROWS_ANNOTATIONS = "ceylon.language.ThrownExceptionAnnotation$annotations$";
@@ -187,6 +188,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
     static final String CEYLON_LANGUAGE_DEPRECATED_ANNOTATION = "ceylon.language.DeprecationAnnotation$annotation$";
     static final String CEYLON_LANGUAGE_SUPPRESS_WARNINGS_ANNOTATION = "ceylon.language.SuppressWarningsAnnotation$annotation$";
     static final String CEYLON_LANGUAGE_LICENSE_ANNOTATION = "ceylon.language.LicenseAnnotation$annotation$";
+    static final String CEYLON_LANGUAGE_LABEL_ANNOTATION = "ceylon.language.LabelAnnotation$annotation$";
     static final String CEYLON_LANGUAGE_TAGS_ANNOTATION = "ceylon.language.TagsAnnotation$annotation$";
     static final String CEYLON_LANGUAGE_ALIASES_ANNOTATION = "ceylon.language.AliasesAnnotation$annotation$";
 
@@ -223,7 +225,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
     private static final TypeMirror THROWABLE_TYPE = simpleCeylonObjectType("java.lang.Throwable");
 //    private static final TypeMirror ERROR_TYPE = simpleCeylonObjectType("java.lang.Error");
     private static final TypeMirror EXCEPTION_TYPE = simpleCeylonObjectType("java.lang.Exception");
-    private static final TypeMirror CEYLON_THROWABLE_TYPE = simpleCeylonObjectType("java.lang.Throwable");
+    private static final TypeMirror CEYLON_THROWABLE_TYPE = simpleCeylonObjectType("ceylon.language.Throwable");
     private static final TypeMirror CEYLON_EXCEPTION_TYPE = simpleCeylonObjectType("ceylon.language.Exception");
     
     private static final TypeMirror STRING_TYPE = simpleJDKObjectType("java.lang.String");
@@ -271,7 +273,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
     private static final String CEYLON_CHAR_ARRAY = "com.redhat.ceylon.compiler.java.language.CharArray";
     private static final String CEYLON_BOOLEAN_ARRAY = "com.redhat.ceylon.compiler.java.language.BooleanArray";
     private static final String CEYLON_OBJECT_ARRAY = "com.redhat.ceylon.compiler.java.language.ObjectArray";
-
+    
     private static final TypeMirror JAVA_BYTE_ARRAY_TYPE = simpleJDKObjectType("java.lang.ByteArray");
     private static final TypeMirror JAVA_SHORT_ARRAY_TYPE = simpleJDKObjectType("java.lang.ShortArray");
     private static final TypeMirror JAVA_INT_ARRAY_TYPE = simpleJDKObjectType("java.lang.IntArray");
@@ -282,18 +284,34 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
     private static final TypeMirror JAVA_BOOLEAN_ARRAY_TYPE = simpleJDKObjectType("java.lang.BooleanArray");
     private static final TypeMirror JAVA_IO_SERIALIZABLE_TYPE_TYPE = simpleJDKObjectType("java.io.Serializable");
     
+    private static final String CEYLON_INTEROP_UTILS = "com.redhat.ceylon.compiler.java.language.Types";
+
+    private static final String JAVA_INTEROP_UTILS = "java.lang.Types";
+
     protected static final String JAVA_LANG_TRANSIENT_ANNOTATION = "java.lang.transient";
     protected static final String JAVA_LANG_VOLATILE_ANNOTATION = "java.lang.volatile";
     protected static final String JAVA_LANG_SYNCHRONIZED_ANNOTATION = "java.lang.synchronized";
     protected static final String JAVA_LANG_NATIVE_ANNOTATION = "java.lang.native";
     protected static final String JAVA_LANG_STRICTFP_ANNOTATION = "java.lang.strictfp";
-    
+    protected static final String JAVA_LANG_OVERLOADED_ANNOTATION = "java.lang.overloaded";
+    protected static final String JAVA_LANG_NONBEAN_ANNOTATION = "java.lang.nonbean";
+
     private static final String CEYLON_INTEROP_TRANSIENT_ANNOTATION = "com.redhat.ceylon.compiler.java.language.transient";
     private static final String CEYLON_INTEROP_VOLATILE_ANNOTATION = "com.redhat.ceylon.compiler.java.language.volatile";
     private static final String CEYLON_INTEROP_SYNCHRONIZED_ANNOTATION = "com.redhat.ceylon.compiler.java.language.synchronized";
     private static final String CEYLON_INTEROP_NATIVE_ANNOTATION = "com.redhat.ceylon.compiler.java.language.native";
     private static final String CEYLON_INTEROP_STRICTFP_ANNOTATION = "com.redhat.ceylon.compiler.java.language.strictfp";
-    
+    private static final String CEYLON_INTEROP_OVERLOADED_ANNOTATION = "com.redhat.ceylon.compiler.java.language.overloaded";
+    private static final String CEYLON_INTEROP_NONBEAN_ANNOTATION = "com.redhat.ceylon.compiler.java.language.nonbean";
+
+    private static final String CEYLON_INTEROP_TRANSIENT_TYPE = "com.redhat.ceylon.compiler.java.language.Transient";
+    private static final String CEYLON_INTEROP_VOLATILE_TYPE = "com.redhat.ceylon.compiler.java.language.Volatile";
+    private static final String CEYLON_INTEROP_SYNCHRONIZED_TYPE = "com.redhat.ceylon.compiler.java.language.Synchronized";
+    private static final String CEYLON_INTEROP_NATIVE_TYPE = "com.redhat.ceylon.compiler.java.language.Native";
+    private static final String CEYLON_INTEROP_STRICTFP_TYPE = "com.redhat.ceylon.compiler.java.language.Strictfp";
+    private static final String CEYLON_INTEROP_OVERLOADED_TYPE = "com.redhat.ceylon.compiler.java.language.Overloaded";
+    private static final String CEYLON_INTEROP_NONBEAN_TYPE = "com.redhat.ceylon.compiler.java.language.Nonbean";
+
     private static final Set<String> CEYLON_INTEROP_DECLARATIONS = new HashSet<String>();
     static {
         CEYLON_INTEROP_DECLARATIONS.add(CEYLON_BYTE_ARRAY);
@@ -306,11 +324,24 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         CEYLON_INTEROP_DECLARATIONS.add(CEYLON_CHAR_ARRAY);
         CEYLON_INTEROP_DECLARATIONS.add(CEYLON_OBJECT_ARRAY);
         
+        CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_UTILS);
+        
         CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_NATIVE_ANNOTATION);
         CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_TRANSIENT_ANNOTATION);
         CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_VOLATILE_ANNOTATION);
         CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_SYNCHRONIZED_ANNOTATION);
         CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_STRICTFP_ANNOTATION);
+        CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_OVERLOADED_ANNOTATION);
+        CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_NONBEAN_ANNOTATION);
+
+        CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_NATIVE_TYPE);
+        CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_TRANSIENT_TYPE);
+        CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_VOLATILE_TYPE);
+        CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_SYNCHRONIZED_TYPE);
+        CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_STRICTFP_TYPE);
+        CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_OVERLOADED_TYPE);
+        CEYLON_INTEROP_DECLARATIONS.add(CEYLON_INTEROP_NONBEAN_TYPE);
+
     }
     
     private static TypeMirror simpleJDKObjectType(String name) {
@@ -465,7 +496,13 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                             || JAVA_LANG_VOLATILE_ANNOTATION.equals(name)
                             || JAVA_LANG_SYNCHRONIZED_ANNOTATION.equals(name)
                             || JAVA_LANG_NATIVE_ANNOTATION.equals(name)
-                            || JAVA_LANG_STRICTFP_ANNOTATION.equals(name)) {
+                            || JAVA_LANG_STRICTFP_ANNOTATION.equals(name)
+                            || JAVA_LANG_OVERLOADED_ANNOTATION.equals(name)
+                            || JAVA_LANG_NONBEAN_ANNOTATION.equals(name)) {
+                        name = "com.redhat.ceylon.compiler.java.language" + name.substring(9);
+                        module = getLanguageModule();
+                    }
+                    if (JAVA_INTEROP_UTILS.equals(name)) {
                         name = "com.redhat.ceylon.compiler.java.language" + name.substring(9);
                         module = getLanguageModule();
                     }
@@ -695,7 +732,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         }
         ClassMirror classMirror = type.getDeclaredClass();
         Module module = findModuleForClassMirror(classMirror);
-        if(isImported(moduleScope, module)){
+        if(module != null && isImported(moduleScope, module)){
             return convertToDeclaration(module, typeName, declarationType);
         }else{
             if(module != null && isFlatClasspath() && isMavenModule(moduleScope))
@@ -1228,163 +1265,203 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
 
     private Declaration createDeclaration(Declaration container, ClassMirror classMirror,
             DeclarationType declarationType, List<Declaration> decls) {
-        Declaration decl = null;
-        Declaration hdr = null;
         
         checkBinaryCompatibility(classMirror);
         
-        ClassType type = getClassType(classMirror);
         boolean isCeylon = classMirror.getAnnotation(CEYLON_CEYLON_ANNOTATION) != null;
         boolean isNativeHeaderMember = container != null && container.isNativeHeader();
         
+        ClassType type = getClassType(classMirror);
         try{
             // make it
             switch(type){
             case ATTRIBUTE:
-                decl = makeToplevelAttribute(classMirror, isNativeHeaderMember);
-                setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, true);
-                if (isCeylon && shouldCreateNativeHeader(decl, container)) {
-                    hdr = makeToplevelAttribute(classMirror, true);
-                    setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
-                }
-                break;
+                return createAttribute(container, classMirror, decls, isCeylon, isNativeHeaderMember);
             case METHOD:
-                decl = makeToplevelMethod(classMirror, isNativeHeaderMember);
-                setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, true);
-                if (isCeylon && shouldCreateNativeHeader(decl, container)) {
-                    hdr = makeToplevelMethod(classMirror, true);
-                    setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
-                }
-                break;
+                return createMethod(container, classMirror, decls, isCeylon, isNativeHeaderMember);
             case OBJECT:
-                // we first make a class
-                Declaration objectClassDecl = makeLazyClass(classMirror, null, null, isNativeHeaderMember);
-                setNonLazyDeclarationProperties(objectClassDecl, classMirror, classMirror, classMirror, true);
-                if (isCeylon && shouldCreateNativeHeader(objectClassDecl, container)) {
-                    Declaration hdrobj = makeLazyClass(classMirror, null, null, true);
-                    setNonLazyDeclarationProperties(hdrobj, classMirror, classMirror, classMirror, true);
-                    decls.add(initNativeHeader(hdrobj, objectClassDecl));
-                }
-                decls.add(objectClassDecl);
-                // then we make a value for it, if it's not an inline object expr
-                if(objectClassDecl.isNamed()){
-                    Declaration objectDecl = makeToplevelAttribute(classMirror, isNativeHeaderMember);
-                    setNonLazyDeclarationProperties(objectDecl, classMirror, classMirror, classMirror, true);
-                    if (isCeylon && shouldCreateNativeHeader(objectDecl, container)) {
-                        Declaration hdrobj = makeToplevelAttribute(classMirror, true);
-                        setNonLazyDeclarationProperties(hdrobj, classMirror, classMirror, classMirror, true);
-                        decls.add(initNativeHeader(hdrobj, objectDecl));
-                    }
-                    decls.add(objectDecl);
-                    // which one did we want?
-                    decl = declarationType == DeclarationType.TYPE ? objectClassDecl : objectDecl;
-                }else{
-                    decl = objectClassDecl;
-                }
-                break;
+                return createObject(container, classMirror, declarationType, decls, isCeylon, isNativeHeaderMember);
             case CLASS:
                 if(classMirror.getAnnotation(CEYLON_ALIAS_ANNOTATION) != null){
-                    decl = makeClassAlias(classMirror);
-                    setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, true);
-                }else if(classMirror.getAnnotation(CEYLON_TYPE_ALIAS_ANNOTATION) != null){
-                    decl = makeTypeAlias(classMirror);
-                    setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, true);
-                }else{
-                    final List<MethodMirror> constructors = getClassConstructors(classMirror, classMirror, constructorOnly);
-                    if (!constructors.isEmpty()) {
-                        Boolean hasConstructors = hasConstructors(classMirror);
-                        if (constructors.size() > 1) {
-                            if (hasConstructors == null || !hasConstructors) {
-                                decl = makeOverloadedConstructor(constructors, classMirror, decls, isCeylon);
-                            } else {
-                                decl = makeLazyClass(classMirror, null, null, isNativeHeaderMember);
-                                setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
-                                if (isCeylon && shouldCreateNativeHeader(decl, container)) {
-                                    hdr = makeLazyClass(classMirror, null, null, true);
-                                    setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
-                                }
-                            }
-                        } else {
-                            if (hasConstructors == null || !hasConstructors) {
-                                // single constructor
-                                MethodMirror constructor = constructors.get(0);
-                                // if the class and constructor have different visibility, we pretend there's an overload of one
-                                // if it's a ceylon class we don't care that they don't match sometimes, like for inner classes
-                                // where the constructor is protected because we want to use an accessor, in this case the class
-                                // visibility is to be used
-                                // Same for coercion
-                                if(isCeylon 
-                                        || (getJavaVisibility(classMirror) == getJavaVisibility(constructor)
-                                            && !isCoercedMethod(constructor))){
-                                    decl = makeLazyClass(classMirror, null, constructor, isNativeHeaderMember);
-                                    setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
-                                    if (isCeylon && shouldCreateNativeHeader(decl, container)) {
-                                        hdr = makeLazyClass(classMirror, null, constructor, true);
-                                        setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
-                                    }
-                                }else{
-                                    decl = makeOverloadedConstructor(constructors, classMirror, decls, isCeylon);
-                                }
-                            } else {
-                                decl = makeLazyClass(classMirror, null, null, isNativeHeaderMember);
-                                setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
-                                if (isCeylon && shouldCreateNativeHeader(decl, container)) {
-                                    hdr = makeLazyClass(classMirror, null, null, true);
-                                    setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
-                                }
-                            }
-                        }
-                    } else if(isCeylon && classMirror.getAnnotation(CEYLON_OBJECT_ANNOTATION) != null) {
-                        // objects don't need overloading stuff
-                        decl = makeLazyClass(classMirror, null, null, isNativeHeaderMember);
-                        setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
-                        if (isCeylon && shouldCreateNativeHeader(decl, container)) {
-                            hdr = makeLazyClass(classMirror, null, null, true);
-                            setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
-                        }
-                    } else {
-                        // no visible constructors
-                        decl = makeLazyClass(classMirror, null, null, isNativeHeaderMember);
-                        setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
-                        if (isCeylon && shouldCreateNativeHeader(decl, container)) {
-                            hdr = makeLazyClass(classMirror, null, null, true);
-                            setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
-                        }
-                    }
-                    if (!isCeylon) {
-                        setSealedFromConstructorMods(decl, constructors);
-                    }
+                    return createClassAlias(classMirror, decls);
                 }
-                break;
+                else if(classMirror.getAnnotation(CEYLON_TYPE_ALIAS_ANNOTATION) != null){
+                    return createTypeAlias(classMirror, decls);
+                }
+                else{
+                    return createClass(container, classMirror, decls, isCeylon, isNativeHeaderMember);
+                }
             case INTERFACE:
-                boolean isAlias = classMirror.getAnnotation(CEYLON_ALIAS_ANNOTATION) != null;
-                if(isAlias){
-                    decl = makeInterfaceAlias(classMirror);
-                }else{
-                    decl = makeLazyInterface(classMirror, isNativeHeaderMember);
+                if(classMirror.getAnnotation(CEYLON_ALIAS_ANNOTATION) != null) {
+                    return createInterfaceAlias(container, classMirror, decls, isCeylon, isNativeHeaderMember);
                 }
-                setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
-                if (!isAlias && isCeylon && shouldCreateNativeHeader(decl, container)) {
-                    hdr = makeLazyInterface(classMirror, true);
-                    setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
+                else {
+                    return createInterface(container, classMirror, decls, isCeylon, isNativeHeaderMember);
                 }
-                break;
+            default:
+                return null;
             }
         }catch(ModelResolutionException x){
-            // FIXME: this may not be the best thing to do, perhaps we should have an erroneous Class,Interface,Function
+            // FIXME: this may not be the best thing to do, perhaps 
+            // we should have an erroneous Class,Interface,Function
             // etc, like javac's model does?
-            decl = logModelResolutionException(x, null, "Failed to load declaration "+classMirror).getDeclaration();
-        }
-
-        // objects have special handling above
-        if (type != ClassType.OBJECT){
-            if (hdr != null) {
-                decls.add(initNativeHeader(hdr, decl));
-            }
-            decls.add(decl);
+            Declaration decl = logModelResolutionException(x, null, "Failed to load declaration "+classMirror).getDeclaration();
+            return addHeaderAndDeclaration(decls, decl, null);
         }
         
-        return hdr != null ? hdr : decl;
+    }
+    
+    private Declaration createTypeAlias(ClassMirror classMirror, List<Declaration> decls) {
+        Declaration decl = makeTypeAlias(classMirror);
+        setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, true);
+        return addHeaderAndDeclaration(decls, decl, null);
+    }
+    
+    private Declaration createClassAlias(ClassMirror classMirror, List<Declaration> decls) {
+        Declaration decl = makeClassAlias(classMirror);
+        setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, true);
+        return addHeaderAndDeclaration(decls, decl, null);
+    }
+    
+    private Declaration createClass(Declaration container, ClassMirror classMirror, List<Declaration> decls, boolean isCeylon, boolean isNativeHeaderMember) {
+        Declaration decl;
+        Declaration hdr = null;
+        final List<MethodMirror> constructors = getClassConstructors(classMirror, classMirror, overloadedConstructorOnly);
+        if (!constructors.isEmpty()) {
+            Boolean hasConstructors = hasConstructors(classMirror);
+            if (constructors.size() > 1) {
+                // only handle overloads here, the named constructors will be added to the abstraction
+                // class on completion
+                decl = makeOverloadedConstructor(constructors, classMirror, decls, isCeylon);
+            } else {
+                if (hasConstructors == null || !hasConstructors) {
+                    // single constructor
+                    MethodMirror constructor = constructors.get(0);
+                    // if the class and constructor have different visibility, we pretend there's an overload of one
+                    // if it's a ceylon class we don't care that they don't match sometimes, like for inner classes
+                    // where the constructor is protected because we want to use an accessor, in this case the class
+                    // visibility is to be used
+                    // Same for coercion
+                    if(isCeylon 
+                            || (getJavaVisibility(classMirror) == getJavaVisibility(constructor)
+                                && !isCoercedMethod(constructor))){
+                        decl = makeLazyClass(classMirror, null, constructor, isNativeHeaderMember);
+                        setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
+                        if (isCeylon && shouldCreateNativeHeader(decl, container)) {
+                            hdr = makeLazyClass(classMirror, null, constructor, true);
+                            setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
+                        }
+                    }else{
+                        decl = makeOverloadedConstructor(constructors, classMirror, decls, isCeylon);
+                    }
+                } else {
+                    decl = makeLazyClass(classMirror, null, null, isNativeHeaderMember);
+                    setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
+                    if (isCeylon && shouldCreateNativeHeader(decl, container)) {
+                        hdr = makeLazyClass(classMirror, null, null, true);
+                        setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
+                    }
+                }
+            }
+        } else if(isCeylon && classMirror.getAnnotation(CEYLON_OBJECT_ANNOTATION) != null) {
+            // objects don't need overloading stuff
+            decl = makeLazyClass(classMirror, null, null, isNativeHeaderMember);
+            setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
+            if (isCeylon && shouldCreateNativeHeader(decl, container)) {
+                hdr = makeLazyClass(classMirror, null, null, true);
+                setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
+            }
+        } else {
+            // no visible constructors
+            decl = makeLazyClass(classMirror, null, null, isNativeHeaderMember);
+            setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
+            if (isCeylon && shouldCreateNativeHeader(decl, container)) {
+                hdr = makeLazyClass(classMirror, null, null, true);
+                setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
+            }
+        }
+        if (!isCeylon) {
+            setSealedFromConstructorMods(decl, constructors);
+        }
+        return addHeaderAndDeclaration(decls, decl, hdr);
+    }
+    
+    private Declaration createInterface(Declaration container, ClassMirror classMirror, List<Declaration> decls, boolean isCeylon, boolean isNativeHeaderMember) {
+        Declaration decl = makeLazyInterface(classMirror, isNativeHeaderMember);
+        Declaration hdr = null;
+        setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
+        if (isCeylon && shouldCreateNativeHeader(decl, container)) {
+            hdr = makeLazyInterface(classMirror, true);
+            setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
+        }
+        return addHeaderAndDeclaration(decls, decl, hdr);
+    }
+    
+    private Declaration createInterfaceAlias(Declaration container, ClassMirror classMirror, List<Declaration> decls, boolean isCeylon, boolean isNativeHeaderMember) {
+        Declaration decl = makeInterfaceAlias(classMirror);
+        setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, isCeylon);
+        return addHeaderAndDeclaration(decls, decl, null);
+    }
+    
+    private Declaration createMethod(Declaration container, ClassMirror classMirror, List<Declaration> decls, boolean isCeylon, boolean isNativeHeaderMember) {
+        Declaration decl = makeToplevelMethod(classMirror, isNativeHeaderMember);
+        Declaration hdr = null;
+        setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, true);
+        if (isCeylon && shouldCreateNativeHeader(decl, container)) {
+            hdr = makeToplevelMethod(classMirror, true);
+            setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
+        }
+        return addHeaderAndDeclaration(decls, decl, hdr);
+    }
+    
+    private Declaration createAttribute(Declaration container, ClassMirror classMirror, List<Declaration> decls, boolean isCeylon, boolean isNativeHeaderMember) {
+        Declaration decl = makeToplevelAttribute(classMirror, isNativeHeaderMember);
+        Declaration hdr = null;
+        setNonLazyDeclarationProperties(decl, classMirror, classMirror, classMirror, true);
+        if (isCeylon && shouldCreateNativeHeader(decl, container)) {
+            hdr = makeToplevelAttribute(classMirror, true);
+            setNonLazyDeclarationProperties(hdr, classMirror, classMirror, classMirror, true);
+        }
+        return addHeaderAndDeclaration(decls, decl, hdr);
+    }
+    
+    private Declaration addHeaderAndDeclaration(List<Declaration> decls, Declaration decl, Declaration hdr) {
+        decls.add(decl);
+        if (hdr == null) {
+            return decl;
+        } else {
+            decls.add(initNativeHeader(hdr, decl));
+            return hdr;
+        }
+    }
+    
+    
+    private Declaration createObject(Declaration container, ClassMirror classMirror, DeclarationType declarationType, List<Declaration> decls, boolean isCeylon, boolean isNativeHeaderMember) {
+        // we first make a class
+        Declaration objectClassDecl = makeLazyClass(classMirror, null, null, isNativeHeaderMember);
+        setNonLazyDeclarationProperties(objectClassDecl, classMirror, classMirror, classMirror, true);
+        if (isCeylon && shouldCreateNativeHeader(objectClassDecl, container)) {
+            Declaration hdrobj = makeLazyClass(classMirror, null, null, true);
+            setNonLazyDeclarationProperties(hdrobj, classMirror, classMirror, classMirror, true);
+            decls.add(initNativeHeader(hdrobj, objectClassDecl));
+        }
+        decls.add(objectClassDecl);
+        
+        // then we make a value for it, if it's not an inline object expr
+        if(objectClassDecl.isNamed()){
+            Declaration objectDecl = makeToplevelAttribute(classMirror, isNativeHeaderMember);
+            setNonLazyDeclarationProperties(objectDecl, classMirror, classMirror, classMirror, true);
+            if (isCeylon && shouldCreateNativeHeader(objectDecl, container)) {
+                Declaration hdrobj = makeToplevelAttribute(classMirror, true);
+                setNonLazyDeclarationProperties(hdrobj, classMirror, classMirror, classMirror, true);
+                decls.add(initNativeHeader(hdrobj, objectDecl));
+            }
+            decls.add(objectDecl);
+            // which one did we want?
+            return declarationType == DeclarationType.TYPE ? objectClassDecl : objectDecl;
+        }else{
+            return objectClassDecl;
+        }
     }
     
     private ClassType getClassType(ClassMirror classMirror) {
@@ -1545,11 +1622,12 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             // we have to check the shared annotation
             decl.setShared(mirror.isPublic() || annotatedMirror.getAnnotation(CEYLON_LANGUAGE_SHARED_ANNOTATION) != null);
             setDeclarationAliases(decl, annotatedMirror);
+            setDeclarationRestrictions(decl, annotatedMirror);
         }else{
             decl.setShared(mirror.isPublic() || (mirror.isDefaultAccess() && classMirror.isInnerClass()) || mirror.isProtected());
-            decl.setPackageVisibility(mirror.isDefaultAccess());
-            decl.setProtectedVisibility(mirror.isProtected());
         }
+        decl.setPackageVisibility(mirror.isDefaultAccess());
+        decl.setProtectedVisibility(mirror.isProtected());
         decl.setDeprecated(isDeprecated(annotatedMirror));
     }
 
@@ -1618,7 +1696,23 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             return methodMirror.isConstructor();
         }
     };
-    
+
+    MethodMirrorFilter overloadedConstructorOnly = new MethodMirrorFilter() {
+        @Override
+        public boolean accept(MethodMirror methodMirror) {
+            return methodMirror.isConstructor()
+                    && methodMirror.getAnnotation(CEYLON_NAME_ANNOTATION) == null;
+        }
+    };
+
+    MethodMirrorFilter namedConstructorOnly = new MethodMirrorFilter() {
+        @Override
+        public boolean accept(MethodMirror methodMirror) {
+            return methodMirror.isConstructor()
+                    && methodMirror.getAnnotation(CEYLON_NAME_ANNOTATION) != null;
+        }
+    };
+
     class ValueConstructorGetter implements MethodMirrorFilter{
         private ClassMirror classMirror;
 
@@ -1666,7 +1760,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                 continue;
 
             // if we are expecting Ceylon code, check that we have enough reified type parameters
-            if(methodContainer.getAnnotation(AbstractModelLoader.CEYLON_CEYLON_ANNOTATION) != null){
+            if(methodContainer.getAnnotation(CEYLON_CEYLON_ANNOTATION) != null){
                 List<AnnotationMirror> tpAnnotations = getTypeParametersFromAnnotations(instantiatedType);
                 int tpCount = tpAnnotations != null ? tpAnnotations.size() : instantiatedType.getTypeParameters().size();
                 if(!checkReifiedTypeDescriptors(tpCount, instantiatedType.getQualifiedName(), methodMirror, true))
@@ -1759,7 +1853,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                               || (!classMirror.isInnerClass() && !classMirror.isLocalClass() && classMirror.isAbstract()));
             
         else
-            klass.setAbstract(classMirror.isAbstract());
+            klass.setAbstract(classMirror.isAbstract() && !classMirror.isEnum());
         klass.setFormal(classMirror.getAnnotation(CEYLON_LANGUAGE_FORMAL_ANNOTATION) != null);
         klass.setDefault(classMirror.getAnnotation(CEYLON_LANGUAGE_DEFAULT_ANNOTATION) != null);
         klass.setSerializable(classMirror.getAnnotation(CEYLON_LANGUAGE_SERIALIZABLE_ANNOTATION) != null
@@ -1849,6 +1943,19 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                         // in cases where the supertype is missing, which throws in reflection at class load.
                         return logModelResolutionException(x.getMessage(), module, "Unable to load type "+typeName).getDeclaration();
                     }
+                    //work around a bug in the IntelliJ model loader
+                    //see https://github.com/ceylon/ceylon-ide-intellij/issues/649
+                    if (classMirror == null 
+                            && theContainer instanceof ClassOrInterface
+                            && theDeclarationType == DeclarationType.TYPE) {
+                        int index = typeName.lastIndexOf('.');
+                        if (index>0) {
+                            String name = 
+                                    typeName.substring(0,index) 
+                                    + '$' + typeName.substring(index+1);
+                            classMirror = lookupClassMirror(module, name);
+                        }
+                    }
                     if (classMirror == null) {
                         // special case when bootstrapping because we may need to pull the decl from the typechecked model
                         if(isBootstrap && typeName.startsWith(CEYLON_LANGUAGE+".")){
@@ -1875,7 +1982,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                                 if(packagePart.startsWith(modulePackagePrefix) || packagePart.equals(module.getNameAsString())){
                                     Package pkg = module.getPackage(packagePart);
                                     if(pkg instanceof LazyPackage){
-                                        Declaration memberFromSource = ((LazyPackage) pkg).getDirectMemberFromSource(namePart, Backends.JAVA);
+                                        Declaration memberFromSource = ((LazyPackage) pkg).getDirectMemberFromSource(namePart, null, false, Backends.JAVA);
                                         if(memberFromSource != null){
                                             if(qualified != null){
                                                 for(String path : qualified){
@@ -2165,6 +2272,20 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             return;
         }
         pkg.setShared(shared);
+        
+        setPackageRestrictions(packageClass, pkg);
+    }
+    
+    private void setPackageRestrictions(ClassMirror packageClass, Package pkg) {
+        AnnotationMirror annot = packageClass.getAnnotation(CEYLON_LANGUAGE_RESTRICTED_ANNOTATION);
+        if (annot != null) {
+            @SuppressWarnings("unchecked")
+            List<String> value = (List<String>) annot.getValue("modules");
+            if(value != null && !value.isEmpty())
+                pkg.setRestrictions(value);
+            else
+                pkg.setShared(false);
+        }
     }
 
     public Module lookupModuleByPackageName(String packageName) {
@@ -2197,7 +2318,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
 
     private boolean isSubPackage(String moduleName, String pkgName) {
         return pkgName.equals(moduleName)
-                || pkgName.startsWith(moduleName+".");
+            || pkgName.startsWith(moduleName+".");
     }
 
     //
@@ -2314,6 +2435,8 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             logWarning("Module class "+moduleClassName+" declares an invalid version: "+version+". It should be: "+module.getVersion());
             return false;
         }
+//        String label = getAnnotationStringValue(moduleClass, CEYLON_MODULE_ANNOTATION, "label");
+//        module.setLabel(label);
         int major = getAnnotationIntegerValue(moduleClass, CEYLON_CEYLON_ANNOTATION, "major", 0);
         int minor = getAnnotationIntegerValue(moduleClass, CEYLON_CEYLON_ANNOTATION, "minor", 0);
         module.setJvmMajor(major);
@@ -2729,7 +2852,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         boolean isNativeHeaderMember = klass.isNativeHeader();
         
         // now that everything has containers, do the inner classes
-        if(klass instanceof Class == false || !((Class)klass).isOverloaded()){
+        if(klass instanceof Class == false || !klass.isOverloaded()){
             // this will not load inner classes of overloads, but that's fine since we want them in the
             // abstracted super class (the real one)
             addInnerClasses(klass, classMirror);
@@ -2746,10 +2869,20 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         // Set up enumerated constructors before looking at getters,
         // because the type of the getter is the constructor's type
         Boolean hasConstructors = hasConstructors(classMirror);
-        if (hasConstructors != null && hasConstructors) {
+        // only add constructors to the abstraction class
+        if (hasConstructors != null && hasConstructors && !klass.isOverloaded()) {
             HashMap<String, MethodMirror> m = new HashMap<>();
+            MethodMirrorFilter methodFilter;
+            // if we're an abstraction we already assigned every nameless constructor to a class
+            // if not, and we have constructors, we may have a single nameless constructor to
+            // collect
+            if(klass.isAbstraction()) {
+                methodFilter = namedConstructorOnly;
+            }else{
+                methodFilter = constructorOnly;
+            }
             // Get all the java constructors...
-            for (MethodMirror ctorMirror : getClassConstructors(classMirror, classMirror, constructorOnly)) {
+            for (MethodMirror ctorMirror : getClassConstructors(classMirror, classMirror, methodFilter)) {
                 m.put(getCtorName(ctorMirror), ctorMirror);
             }
             for (MethodMirror ctor : getClassConstructors(
@@ -3065,7 +3198,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                                     && !setter.isDefaultAccess() && !value.mirror.isDefaultAccess())) {
                         VariableMirror setterParam = setter.getParameters().get(0);
                         Module module = ModelUtil.getModuleContainer(klass);
-                        Type paramType = obtainType(setterParam.getType(), setterParam, klass, module, VarianceLocation.INVARIANT,
+                        Type paramType = obtainType(setterParam.getType(), setterParam, klass, module,
                                 "setter '"+setter.getName()+"'", klass);
                         NullStatus nullPolicy = getUncheckedNullPolicy(isCeylon, setterParam.getType(), setterParam);
                         // if there's no annotation on the setter param, inherit annotations from getter
@@ -3210,9 +3343,9 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
 
     private boolean addingFieldWouldConflictWithMember(ClassOrInterface klass, String name) {
         return klass.getDirectMember(name, null, false) != null
-                || "equals".equals(name)
-                || "string".equals(name)
-                || "hash".equals(name);
+            || "equals".equals(name)
+            || "string".equals(name)
+            || "hash".equals(name);
     }
     
     private boolean keepField(FieldMirror fieldMirror, boolean isCeylon, boolean isFromJDK) {
@@ -3240,10 +3373,10 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                     && !setter.isDefaultAccess() && !getter.isDefaultAccess())) {
             Module module = ModelUtil.getModuleContainer(klass);
             VariableMirror setterParam = setter.getParameters().get(0);
-            Type paramType = obtainType(setterParam.getType(), setterParam, klass, module, VarianceLocation.INVARIANT,
+            Type paramType = obtainType(setterParam.getType(), setterParam, klass, module,
                     "setter '"+setter.getName()+"'", klass);
 
-            Type returnType = obtainType(getter.getReturnType(), getter, klass, module, VarianceLocation.INVARIANT,
+            Type returnType = obtainType(getter.getReturnType(), getter, klass, module, 
                     "getter '"+getter.getName()+"'", klass);
             // only add the setter if it has exactly the same type as the getter
             if(paramType.isExactly(returnType)){
@@ -3711,10 +3844,11 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         // and its return type
         // do not log an additional error if we had one from checking if it was overriding
         if(type == null)
-            type = obtainType(methodMirror.getReturnType(), methodMirror, method, module, VarianceLocation.COVARIANT,
+            type = obtainType(methodMirror.getReturnType(), methodMirror, method, module,
                               "method '"+methodMirror.getName()+"'", klass);
         
-        switch(getUncheckedNullPolicy(isCeylon, methodMirror.getReturnType(), methodMirror)){
+        NullStatus nullPolicy = getUncheckedNullPolicy(isCeylon, methodMirror.getReturnType(), methodMirror);
+        switch(nullPolicy){
         case Optional:
             if(!isCeylon){
                 type = makeOptionalTypePreserveUnderlyingType(type, module);
@@ -3757,8 +3891,9 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         List<Type> result = null;
         if (decl instanceof Functional) {
             Functional func = (Functional)decl;
-            if (func.getParameterLists().size() > 0) {
-                List<Parameter> params = func.getFirstParameterList().getParameters();
+            ParameterList firstParameterList = func.getFirstParameterList();
+            if (firstParameterList!=null) {
+                List<Parameter> params = firstParameterList.getParameters();
                 result = new ArrayList<Type>(params.size());
                 for (Parameter p : params) {
                     result.add(p.getType());
@@ -3779,7 +3914,8 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
     
     private boolean allReifiedTypeParameters(List<VariableMirror> list) {
         for (VariableMirror v : list) {
-            if ("com.redhat.ceylon.compiler.java.runtime.model.TypeDescriptor".equals(v.getType().getQualifiedName())) {
+            if ("com.redhat.ceylon.compiler.java.runtime.model.TypeDescriptor"
+                    .equals(v.getType().getQualifiedName())) {
                 continue;
             } else {
                 return false;
@@ -3915,6 +4051,17 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             return true;
         if(isFunctionCercion(type))
             return true;
+        if (type.getKind()==TypeKind.ARRAY)
+            switch (type.getComponentType().getKind()) {
+            case LONG:
+            case DOUBLE:
+            case BOOLEAN:
+            case BYTE:
+            case DECLARED:
+            case TYPEVAR:
+                return true;
+            default: //ignore
+            }
         return false;
     }
     
@@ -3931,7 +4078,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         value.setScope(scope);
         parameter.setName("that");
         value.setName("that");
-        value.setType(getNonPrimitiveType(getLanguageModule(), CEYLON_OBJECT_TYPE, decl, VarianceLocation.INVARIANT));
+        value.setType(getNonPrimitiveType(getLanguageModule(), CEYLON_OBJECT_TYPE, decl));
         parameter.setDeclaration((Declaration) decl);
         parameters.getParameters().add(parameter);
         decl.addMember(value);
@@ -3958,6 +4105,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         value.setPackageVisibility(fieldMirror.isDefaultAccess());
         value.setStatic(fieldMirror.isStatic());
         setDeclarationAliases(value, fieldMirror);
+        setDeclarationRestrictions(value, fieldMirror);
         // field can't be abstract or interface, so not formal
         // can we override fields? good question. Not really, but from an external point of view?
         // FIXME: figure this out: (default)
@@ -3972,30 +4120,28 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             value.setEnumValue(true);
         
         Module module = ModelUtil.getModuleContainer(klass);
-        Type type = obtainType(fieldMirror.getType(), fieldMirror, klass, module, VarianceLocation.INVARIANT,
+        Type type = obtainType(fieldMirror.getType(), fieldMirror, klass, module,
                 "field '"+value.getName()+"'", klass);
         if (type.isCached()) {
             type = type.clone();
         }
         
         if (value.isEnumValue()) {
-            Class enumValueType = new Class();
-            enumValueType.setValueConstructor(true);
+            Constructor enumValueType = new Constructor();
             enumValueType.setJavaEnum(true);
-            enumValueType.setAnonymous(true);
             enumValueType.setExtendedType(type);
             Scope scope = value.getContainer();
             enumValueType.setContainer(scope);
             enumValueType.setScope(scope);
             enumValueType.setDeprecated(value.isDeprecated());
             enumValueType.setName(value.getName());
-            enumValueType.setFinal(true);
             enumValueType.setUnit(value.getUnit());
             enumValueType.setStatic(value.isStatic());
             value.setType(enumValueType.getType());
             value.setUncheckedNullType(false);
         } else {
-            switch(getUncheckedNullPolicy(isCeylon, fieldMirror.getType(), fieldMirror)){
+            NullStatus nullPolicy = getUncheckedNullPolicy(isCeylon, fieldMirror.getType(), fieldMirror);
+            switch(nullPolicy){
             case Optional:
                 if(!isCeylon){
                     type = makeOptionalTypePreserveUnderlyingType(type, module);
@@ -4084,7 +4230,8 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                     scope = (TypeDeclaration)decl;
                 }
                 TypeDeclaration typeDecl = (TypeDeclaration) scope;
-                return !typeDecl.getTypeParameters().isEmpty() && type.getTypeArguments().isEmpty();
+                return typeDecl.isParameterized() 
+                    && type.getTypeArguments().isEmpty();
             }
             try{
                 return type.isRaw();
@@ -4117,7 +4264,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
 
         // do not log an additional error if we had one from checking if it was overriding
         if(type == null)
-            type = obtainType(methodMirror.getReturnType(), methodMirror, klass, module, VarianceLocation.INVARIANT,
+            type = obtainType(methodMirror.getReturnType(), methodMirror, klass, module, 
                               "getter '"+methodName+"'", klass);
         if (type.isCached()) {
             type = type.clone();
@@ -4125,7 +4272,8 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         // special case for hash attributes which we want to pretend are of type long internally
         if(value.isShared() && methodName.equals("hash"))
             type.setUnderlyingType("long");
-        switch(getUncheckedNullPolicy(isCeylon, methodMirror.getReturnType(), methodMirror)){
+        NullStatus nullPolicy = getUncheckedNullPolicy(isCeylon, methodMirror.getReturnType(), methodMirror);
+        switch(nullPolicy){
         case Optional:
             if(!isCeylon){
                 type = makeOptionalTypePreserveUnderlyingType(type, module);
@@ -4180,6 +4328,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         decl.setProtectedVisibility(methodMirror.isProtected());
         decl.setPackageVisibility(methodMirror.isDefaultAccess());
         setDeclarationAliases(decl, methodMirror);
+        setDeclarationRestrictions(decl, methodMirror);
         if(decl instanceof Value){
             setValueTransientLateFlags((Value)decl, methodMirror, isCeylon);
         }
@@ -4226,7 +4375,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             // we never consider Interface and other stuff, since we never register the actualCompleter for them
             if(decl instanceof Class){
                 // Java member classes are never actual 
-                if(!JvmBackendUtil.isCeylon((Class)decl))
+                if(!ModelUtil.isCeylonDeclaration((Class)decl))
                     return;
                 // we already set the actual bit for member classes, we just need the refined decl
                 if(decl.isActual()){
@@ -4264,7 +4413,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                 
                 // now that we know the refined declaration, we can check for reified type param support
                 // for Ceylon methods
-                if(decl instanceof JavaMethod && JvmBackendUtil.isCeylon(klass)){
+                if(decl instanceof JavaMethod && ModelUtil.isCeylonDeclaration(klass)){
                     if(!methodMirror.getTypeParameters().isEmpty()
                             // because this requires the refined decl, we defer this check until we've set it, to not trigger
                             // lazy loading just to check.
@@ -4307,9 +4456,9 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         if(klass instanceof Interface){
             // interfaces need to have their superclass set to Object
             if(superClass == null || superClass.getKind() == TypeKind.NONE)
-                extendedType = getNonPrimitiveType(getLanguageModule(), CEYLON_OBJECT_TYPE, klass, VarianceLocation.INVARIANT);
+                extendedType = getNonPrimitiveType(getLanguageModule(), CEYLON_OBJECT_TYPE, klass);
             else
-                extendedType = getNonPrimitiveType(ModelUtil.getModule(klass), superClass, klass, VarianceLocation.INVARIANT);
+                extendedType = getNonPrimitiveType(ModelUtil.getModule(klass), superClass, klass);
         }else if(klass instanceof Class && ((Class) klass).isOverloaded()){
             // if the class is overloaded we already have it stored
             extendedType = klass.getExtendedType();
@@ -4322,7 +4471,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             }else if(className.equals("java.lang.Object")){
                 // we pretend its superclass is something else, but note that in theory we shouldn't 
                 // be seeing j.l.Object at all due to unerasure
-                extendedType = getNonPrimitiveType(getLanguageModule(), CEYLON_BASIC_TYPE, klass, VarianceLocation.INVARIANT);
+                extendedType = getNonPrimitiveType(getLanguageModule(), CEYLON_BASIC_TYPE, klass);
             }else{
                 // read it from annotation first
                 String annotationSuperClassName = getAnnotationStringValue(classMirror, CEYLON_CLASS_ANNOTATION, "extendsType");
@@ -4333,10 +4482,10 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                     // read it from the Java super type
                     // now deal with type erasure, avoid having Object as superclass
                     if("java.lang.Object".equals(superClassName)){
-                        extendedType = getNonPrimitiveType(getLanguageModule(), CEYLON_BASIC_TYPE, klass, VarianceLocation.INVARIANT);
+                        extendedType = getNonPrimitiveType(getLanguageModule(), CEYLON_BASIC_TYPE, klass);
                     } else if(superClass != null){
                         try{
-                            extendedType = getNonPrimitiveType(ModelUtil.getModule(klass), superClass, klass, VarianceLocation.INVARIANT);
+                            extendedType = getNonPrimitiveType(ModelUtil.getModule(klass), superClass, klass);
                         }catch(ModelResolutionException x){
                             extendedType = logModelResolutionException(x, klass, "Error while resolving extended type of "+klass.getQualifiedNameString());
                         }
@@ -4459,7 +4608,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                     type = applyTypeCoercion(variadicType, paramMirror, methodMirror, paramName, (Declaration)decl, module, scope);
                     coercedParameter = true;
                 }else{
-                    type = obtainType(module, variadicType, scope, TypeLocation.TOPLEVEL, VarianceLocation.CONTRAVARIANT);
+                    type = obtainType(module, variadicType, scope, TypeLocation.TOPLEVEL);
                 }
                 if(!isCeylon){
                     // Java parameters are all optional unless primitives or annotated as such
@@ -4475,7 +4624,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                     type = applyTypeCoercion(typeMirror, paramMirror, methodMirror, paramName, (Declaration)decl, module, scope);
                     coercedParameter = true;
                 }else{
-                    type = obtainType(typeMirror, paramMirror, scope, module, VarianceLocation.CONTRAVARIANT,
+                    type = obtainType(typeMirror, paramMirror, scope, module, 
                             "parameter '"+paramName+"' of method '"+methodMirror.getName()+"'", (Declaration)decl);
                 }
                 if(!isCeylon){
@@ -4489,7 +4638,8 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                 type = type.clone();
             }
             
-            type.setRaw(isRaw(ModelUtil.getModuleContainer(container), typeMirror));
+            if(!type.isRaw())
+                type.setRaw(isRaw(ModelUtil.getModuleContainer(container), typeMirror));
             
             FunctionOrValue value = null;
             boolean lookedup = false;
@@ -4523,8 +4673,9 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                 value.setUnit(scope.getUnit());
                 value.setName(paramName);
             }else{
-                // Ceylon 1.1 had a bug where TypeInfo for functional parameters included the full CallableType on the method
-                // rather than just the method return type, so we try to detect this and fix it
+                // Ceylon 1.1 had a bug where TypeInfo for functional parameters 
+                // included the full CallableType on the method rather than just 
+                // the method return type, so we try to detect this and fix it
                 if(value instanceof Function 
                         && isCeylon1Dot1(classMirror)){
                     Type newType = getSimpleCallableReturnType(value.getType());
@@ -4541,9 +4692,10 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                 parameter.setSequenced(true);
             if(paramMirror.getAnnotation(CEYLON_DEFAULTED_ANNOTATION) != null)
                 parameter.setDefaulted(true);
-            if (parameter.isSequenced() &&
+            if (parameter.isSequenced() 
                     // FIXME: store info in Sequenced
-                    typeFactory.isNonemptyIterableType(parameter.getType())) {
+                    && "ceylon.language.Sequence"
+                            .equals(paramMirror.getType().getQualifiedName())) {
                 parameter.setAtLeastOne(true);
             }
             // unboxed is already set if it's a real method
@@ -4585,7 +4737,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
 
             Type returnType = 
                     obtainType(moduleScope, functionalInterfaceType.getReturnType(), 
-                            scope, TypeLocation.TOPLEVEL, VarianceLocation.COVARIANT);
+                            scope, TypeLocation.TOPLEVEL);
             switch(getUncheckedNullPolicy(false, functionalInterfaceType.getReturnType(), functionalMethod)){
             case Optional:
             case UncheckedNull:
@@ -4596,11 +4748,11 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             
             ParameterList pl = new ParameterList();
             int count = 0;
-            List<VariableMirror> functionalParameters = functionalMethod.getParameters();
+//            List<VariableMirror> functionalParameters = functionalMethod.getParameters();
             for(TypeMirror parameterType : functionalInterfaceType.getParameterTypes()){
                 Type modelParameterType = 
                         obtainType(moduleScope, parameterType, scope, 
-                                TypeLocation.TOPLEVEL, VarianceLocation.CONTRAVARIANT);
+                                TypeLocation.TOPLEVEL);
                 Parameter p = new Parameter();
                 Value v = new Value();
                 String name = "arg" + count++;
@@ -4650,12 +4802,38 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             // It's much easier to obtain the java.lang.Class<...> type and extract its TP than
             // just obtain its TP, because wildcards are dealt with in obtainTypeArguments, not
             // for "toplevel" wildcards
-            Type classType = obtainType(type, annotatedMirror, scope, module, VarianceLocation.CONTRAVARIANT,
+            Type classType = obtainType(type, annotatedMirror, scope, module, 
                     "parameter '"+paramName+"' of method '"+methodMirror.getName()+"'", (Declaration)decl);
             // gracefully give up with the original type in case of errors
             if(classType.isUnknown() || classType.getTypeArgumentList().isEmpty())
                 return classType;
             return typeFactory.getClassOrInterfaceModelType(classType.getTypeArgumentList().get(0));
+        }
+        if (type.getKind()==TypeKind.ARRAY) {
+            TypeDeclaration ad = typeFactory.getArrayDeclaration();
+            TypeMirror elementType = type.getComponentType();
+            switch (elementType.getKind()) {
+            case LONG:
+                return ad.appliedType(null, 
+                        Arrays.asList(typeFactory.getIntegerType()));
+            case DOUBLE:
+                return ad.appliedType(null, 
+                        Arrays.asList(typeFactory.getFloatType()));
+            case BOOLEAN:
+                return ad.appliedType(null, 
+                        Arrays.asList(typeFactory.getBooleanType()));
+            case BYTE:
+                return ad.appliedType(null, 
+                        Arrays.asList(typeFactory.getByteType()));
+            case DECLARED:
+            case TYPEVAR:
+                Type elemType = 
+                        obtainType(module, elementType, scope, 
+                                TypeLocation.TYPE_PARAM);
+                return ad.appliedType(null, 
+                        Arrays.asList(typeFactory.getOptionalType(elemType)));
+            default: //impossible!
+            }
         }
         return getFunctionalInterfaceAsCallable(module, scope, type);
     }
@@ -4666,6 +4844,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             optionalType = optionalType.clone();
         }
         optionalType.setUnderlyingType(type.getUnderlyingType());
+        optionalType.setRaw(type.isRaw());
         return optionalType;
     }
 
@@ -4934,7 +5113,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                         return;
                     }
                     value.setDeprecated(value.isDeprecated() | isDeprecated(meth));
-                    value.setType(obtainType(meth.getReturnType(), meth, null, ModelUtil.getModuleContainer(value.getContainer()), VarianceLocation.INVARIANT,
+                    value.setType(obtainType(meth.getReturnType(), meth, null, ModelUtil.getModuleContainer(value.getContainer()), 
                             "toplevel attribute", value));
 
                     markVariable(value);
@@ -5056,7 +5235,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                     // type params first
                     setTypeParameters(method, meth, true);
 
-                    method.setType(obtainType(meth.getReturnType(), meth, method, ModelUtil.getModuleContainer(method), VarianceLocation.COVARIANT,
+                    method.setType(obtainType(meth.getReturnType(), meth, method, ModelUtil.getModuleContainer(method),
                             "toplevel method", method));
                     method.setDeclaredVoid(meth.isDeclaredVoid());
                     markDeclaredVoid(method, meth);
@@ -5249,7 +5428,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                         || (classMirror.getAnnotation(CEYLON_CEYLON_ANNOTATION) != null && sameType(iface, JAVA_IO_SERIALIZABLE_TYPE_TYPE)))
                     continue;
                 try{
-                    klass.getSatisfiedTypes().add(getNonPrimitiveType(ModelUtil.getModule(klass), iface, klass, VarianceLocation.INVARIANT));
+                    klass.getSatisfiedTypes().add(getNonPrimitiveType(ModelUtil.getModule(klass), iface, klass));
                 }catch(ModelResolutionException x){
                     String classPackageName = unquotePackageName(classMirror.getPackage());
                     if(jdkProvider.isJDKPackage(classPackageName)){
@@ -5451,13 +5630,13 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                     // especially since we do not want it for types
                     if(bounds.size() == 1)
                         break;
-                    boundType = getNonPrimitiveType(getLanguageModule(), CEYLON_OBJECT_TYPE, scope, VarianceLocation.INVARIANT);
+                    boundType = getNonPrimitiveType(getLanguageModule(), CEYLON_OBJECT_TYPE, scope);
                 }else
-                    boundType = getNonPrimitiveType(ModelUtil.getModuleContainer(scope), bound, scope, VarianceLocation.INVARIANT);
+                    boundType = getNonPrimitiveType(ModelUtil.getModuleContainer(scope), bound, scope);
                 param.getSatisfiedTypes().add(boundType);
             }
             if(needsObjectBounds && param.getSatisfiedTypes().isEmpty()){
-                Type boundType = getNonPrimitiveType(getLanguageModule(), CEYLON_OBJECT_TYPE, scope, VarianceLocation.INVARIANT);
+                Type boundType = getNonPrimitiveType(getLanguageModule(), CEYLON_OBJECT_TYPE, scope);
                 param.getSatisfiedTypes().add(boundType);
             }
         }
@@ -5548,7 +5727,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
     }
 
     /** Warning: only valid for toplevel types, not for type parameters */
-    private Type obtainType(TypeMirror type, AnnotatedMirror symbol, Scope scope, Module moduleScope, VarianceLocation variance, 
+    private Type obtainType(TypeMirror type, AnnotatedMirror symbol, Scope scope, Module moduleScope, 
                                     String targetType, Declaration target) {
         String typeName = getAnnotationStringValue(symbol, CEYLON_TYPE_INFO_ANNOTATION);
         if (typeName != null) {
@@ -5561,7 +5740,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             return ret;
         } else {
             try{
-                return obtainType(moduleScope, type, scope, TypeLocation.TOPLEVEL, variance);
+                return obtainType(moduleScope, type, scope, TypeLocation.TOPLEVEL);
             }catch(ModelResolutionException x){
                 String text = formatTypeErrorMessage("Error while resolving type of", targetType, target, scope);
                 return logModelResolutionException(x, scope, text);
@@ -5573,21 +5752,6 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         TOPLEVEL, TYPE_PARAM;
     }
     
-    private enum VarianceLocation {
-        /**
-         * Used in parameter
-         */
-        CONTRAVARIANT,
-        /**
-         * Used in method return value
-         */
-        COVARIANT,
-        /**
-         * For field
-         */
-        INVARIANT;
-    }
-
     private String getUnderlyingType(TypeMirror type, TypeLocation location){
         // don't erase to c.l.String if in a type param location
         if ((sameType(type, STRING_TYPE) && location != TypeLocation.TYPE_PARAM)
@@ -5601,12 +5765,12 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         return null;
     }
     
-    public Type obtainType(Module moduleScope, TypeMirror type, Scope scope, TypeLocation location, VarianceLocation variance) {
+    public Type obtainType(Module moduleScope, TypeMirror type, Scope scope, TypeLocation location) {
         TypeMirror originalType = type;
         // ERASURE
         type = applyTypeMapping(type, location);
         
-        Type ret = getNonPrimitiveType(moduleScope, type, scope, variance);
+        Type ret = getNonPrimitiveType(moduleScope, type, scope);
         if (ret.isCached()) {
             ret = ret.clone();
         }
@@ -5645,13 +5809,13 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
 
             Type returnType = 
                     obtainType(moduleScope, functionalInterfaceType.getReturnType(), 
-                            scope, TypeLocation.TOPLEVEL, VarianceLocation.COVARIANT);
+                            scope, TypeLocation.TOPLEVEL);
             java.util.List<Type> modelParameterTypes =
                     new ArrayList<Type>(functionalInterfaceType.getParameterTypes().size());
             for(TypeMirror parameterType : functionalInterfaceType.getParameterTypes()){
                 Type modelParameterType = 
                         obtainType(moduleScope, parameterType, scope, 
-                                TypeLocation.TOPLEVEL, VarianceLocation.CONTRAVARIANT);
+                                TypeLocation.TOPLEVEL);
                 modelParameterTypes.add(modelParameterType);
             }
             com.redhat.ceylon.model.typechecker.model.Type parameterTuple = typeFactory.getTupleType(modelParameterTypes, functionalInterfaceType.isVariadic(), false, -1);
@@ -5751,12 +5915,12 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         return convertToDeclaration(module, typeName, declarationType);
     }
 
-    private Type getNonPrimitiveType(Module moduleScope, TypeMirror type, Scope scope, VarianceLocation variance) {
+    private Type getNonPrimitiveType(Module moduleScope, TypeMirror type, Scope scope) {
         TypeDeclaration declaration = (TypeDeclaration) convertNonPrimitiveTypeToDeclaration(moduleScope, type, scope, DeclarationType.TYPE);
         if(declaration == null){
             throw new ModelResolutionException("Failed to find declaration for "+type.getQualifiedName());
         }
-        return applyTypeArguments(moduleScope, declaration, type, scope, variance, TypeMappingMode.NORMAL, null);
+        return applyTypeArguments(moduleScope, declaration, type, scope, TypeMappingMode.NORMAL, null);
     }
 
     private enum TypeMappingMode {
@@ -5767,10 +5931,10 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
     private static class RecursiveTypeParameterBoundException extends RuntimeException {}
     
     private Type applyTypeArguments(Module moduleScope, TypeDeclaration declaration,
-                                            TypeMirror type, Scope scope, VarianceLocation variance,
-                                            TypeMappingMode mode, Set<TypeDeclaration> rawDeclarationsSeen) {
+                                            TypeMirror type, Scope scope, TypeMappingMode mode, 
+                                            Set<TypeDeclaration> rawDeclarationsSeen) {
         List<TypeMirror> javacTypeArguments = type.getTypeArguments();
-        boolean hasTypeParameters = !declaration.getTypeParameters().isEmpty();
+        boolean hasTypeParameters = declaration.isParameterized();
         boolean hasTypeArguments = !javacTypeArguments.isEmpty();
         boolean isRaw = !hasTypeArguments && hasTypeParameters;
         // if we have type arguments or type parameters (raw)
@@ -5833,6 +5997,9 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                             try{
                                 producedTypeArgument = obtainTypeParameterBound(moduleScope, bound, declaration, rawDeclarationsSeen);
                                 siteVariance = SiteVariance.OUT;
+                                // make sure we record that the type is not what it seems it is, so we can implement
+                                // the method with proper raw type args and not substituted bounds
+                                isRaw = true;
                             }catch(RecursiveTypeParameterBoundException x){
                                 // damnit, go for Object later
                             }
@@ -5847,7 +6014,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                     }
 
                     // record use-site variance if required
-                    if(!JvmBackendUtil.isCeylon(declaration) && siteVariance != null){
+                    if(!ModelUtil.isCeylonDeclaration(declaration) && siteVariance != null){
                         // lazy alloc
                         if(siteVarianceMap == null)
                             siteVarianceMap = new HashMap<TypeParameter,SiteVariance>();
@@ -5857,7 +6024,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                     // in some cases we may already have a produced type argument we can use. if not let's fetch it
                     if(producedTypeArgument == null){
                         if(mode == TypeMappingMode.NORMAL)
-                            producedTypeArgument = obtainType(moduleScope, typeArgument, scope, TypeLocation.TYPE_PARAM, variance);
+                            producedTypeArgument = obtainType(moduleScope, typeArgument, scope, TypeLocation.TYPE_PARAM);
                         else
                             producedTypeArgument = obtainTypeParameterBound(moduleScope, typeArgument, scope, rawDeclarationsSeen);
                     }
@@ -5865,7 +6032,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
                 }
                 Type qualifyingType = null;
                 if(type.getQualifyingType() != null){
-                    qualifyingType = getNonPrimitiveType(moduleScope, type.getQualifyingType(), scope, variance);
+                    qualifyingType = getNonPrimitiveType(moduleScope, type.getQualifyingType(), scope);
                 }
                 Type ret = declaration.appliedType(qualifyingType, typeArguments);
                 if(siteVarianceMap != null){
@@ -5886,7 +6053,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         // we have no type args, but perhaps we have a qualifying type which has some?
         if(type.getQualifyingType() != null){
             // that one may have type arguments
-            Type qualifyingType = getNonPrimitiveType(moduleScope, type.getQualifyingType(), scope, variance);
+            Type qualifyingType = getNonPrimitiveType(moduleScope, type.getQualifyingType(), scope);
             Type ret = declaration.appliedType(qualifyingType, Collections.<Type>emptyList());
             if (ret.isCached()) {
                 ret = ret.clone();
@@ -5923,7 +6090,7 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
             if(declaration instanceof UnknownType)
                 return declaration.getType();
 
-            Type ret = applyTypeArguments(moduleScope, declaration, type, scope, VarianceLocation.CONTRAVARIANT, TypeMappingMode.GENERATOR, rawDeclarationsSeen);
+            Type ret = applyTypeArguments(moduleScope, declaration, type, scope, TypeMappingMode.GENERATOR, rawDeclarationsSeen);
             if (ret.isCached()) {
                 ret = ret.clone();
             }
@@ -6431,12 +6598,15 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
         convertToDeclaration(getJDKBaseModule(), JAVA_LANG_TRANSIENT_ANNOTATION, DeclarationType.VALUE);
         convertToDeclaration(getJDKBaseModule(), JAVA_LANG_VOLATILE_ANNOTATION, DeclarationType.VALUE);
         convertToDeclaration(getJDKBaseModule(), JAVA_LANG_SYNCHRONIZED_ANNOTATION, DeclarationType.VALUE);
-        convertToDeclaration(getJDKBaseModule(), JAVA_LANG_NATIVE_ANNOTATION, DeclarationType.VALUE);
+        convertToDeclaration(getJDKBaseModule(), JAVA_LANG_STRICTFP_ANNOTATION, DeclarationType.VALUE);
+        convertToDeclaration(getJDKBaseModule(), JAVA_LANG_OVERLOADED_ANNOTATION, DeclarationType.VALUE);
+        convertToDeclaration(getJDKBaseModule(), JAVA_LANG_NONBEAN_ANNOTATION, DeclarationType.VALUE);
     }
     
     protected void loadJavaBaseExtras() {
         loadJavaBaseArrays();
         loadJavaBaseAnnotations();
+        convertToDeclaration(getJDKBaseModule(), JAVA_INTEROP_UTILS, DeclarationType.TYPE);
     }
     
     /**
@@ -6461,12 +6631,22 @@ public abstract class AbstractModelLoader implements ModelCompleter, ModelLoader
     }
 
     private static void setDeclarationAliases(Declaration decl, AnnotatedMirror mirror){
-        AnnotationMirror annot = mirror.getAnnotation(AbstractModelLoader.CEYLON_LANGUAGE_ALIASES_ANNOTATION);
+        AnnotationMirror annot = mirror.getAnnotation(CEYLON_LANGUAGE_ALIASES_ANNOTATION);
         if (annot != null) {
             @SuppressWarnings("unchecked")
             List<String> value = (List<String>) annot.getValue("aliases");
             if(value != null && !value.isEmpty())
                 decl.setAliases(value);
+        }
+    }
+
+    private static void setDeclarationRestrictions(Declaration decl, AnnotatedMirror mirror){
+        AnnotationMirror annot = mirror.getAnnotation(CEYLON_LANGUAGE_RESTRICTED_ANNOTATION);
+        if (annot != null) {
+            @SuppressWarnings("unchecked")
+            List<String> value = (List<String>) annot.getValue("modules");
+            if(value != null && !value.isEmpty())
+                decl.setRestrictions(value);
         }
     }
 

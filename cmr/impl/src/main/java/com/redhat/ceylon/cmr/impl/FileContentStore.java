@@ -25,9 +25,7 @@ import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -54,6 +52,10 @@ public class FileContentStore implements ContentStore, StructureBuilder {
         if (root == null)
             throw new IllegalArgumentException("Null root!");
         this.root = root;
+    }
+    
+    protected File getRoot() {
+        return root;
     }
 
     public Iterable<File> getBaseDirectories() {
@@ -84,7 +86,7 @@ public class FileContentStore implements ContentStore, StructureBuilder {
         File file = cache.get(node);
         if (file == null) {
             File parent = getFileInternal(NodeUtils.firstParent(node));
-            file = new File(parent, node.getLabel()); // bevare of concatinated names; e.g sha1.local
+            file = new File(parent, node.getLabel()); // beware of concatenated names; e.g sha1.local
             cache.put(node, file);
         }
         return file;

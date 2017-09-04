@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.redhat.ceylon.common.JVMModuleUtil;
-import com.redhat.ceylon.compiler.java.codegen.Strategy.DefaultParameterMethodOwner;
 import com.redhat.ceylon.compiler.java.util.Util;
 import com.redhat.ceylon.compiler.typechecker.tree.Tree;
 import com.redhat.ceylon.compiler.typechecker.tree.Visitor;
@@ -254,7 +253,7 @@ public class Naming extends NamingBase implements LocalId {
         void noteDecl(Declaration decl) {
             if (decl.isToplevel()) {
                 resetLocals();
-            } else if (Decl.isLocalNotInitializer(decl)){
+            } else if (ModelUtil.isLocalNotInitializer(decl)){
                 local(decl.getContainer());
             }
         }
@@ -279,7 +278,7 @@ public class Naming extends NamingBase implements LocalId {
         
         @Override
         public void visit(Tree.AnyMethod that) {
-            if (Decl.isLocalNotInitializer(that.getDeclarationModel())) {
+            if (ModelUtil.isLocalNotInitializer(that.getDeclarationModel())) {
                 noteDecl(that.getDeclarationModel());
             }
             super.visit(that);
@@ -287,7 +286,7 @@ public class Naming extends NamingBase implements LocalId {
         
         @Override
         public void visit(Tree.AttributeGetterDefinition that) {
-            if (Decl.isLocalNotInitializer(that.getDeclarationModel())) {
+            if (ModelUtil.isLocalNotInitializer(that.getDeclarationModel())) {
                 noteDecl(that.getDeclarationModel());
             }
             super.visit(that);
@@ -295,7 +294,7 @@ public class Naming extends NamingBase implements LocalId {
         
         @Override
         public void visit(Tree.AttributeSetterDefinition that) {
-            if (Decl.isLocalNotInitializer(that.getDeclarationModel())) {
+            if (ModelUtil.isLocalNotInitializer(that.getDeclarationModel())) {
                 noteDecl(that.getDeclarationModel());
             }
             super.visit(that);
@@ -333,7 +332,7 @@ public class Naming extends NamingBase implements LocalId {
         }
         private boolean isCeylonTypeDecl() {
             return decl instanceof TypeDeclaration 
-                    && Decl.isCeylon((TypeDeclaration)decl);
+                    && ModelUtil.isCeylonDeclaration((TypeDeclaration)decl);
         }
         final void selectAppended() {
             String name = sb.toString();
@@ -429,11 +428,11 @@ public class Naming extends NamingBase implements LocalId {
         Collections.reverse(l);
         
         if (flags.contains(DeclNameFlag.QUALIFIED) && (!decl.isAnonymous() || decl.isNamed())) {
-            final List<String> packageName;
-            if(!AbstractTransformer.isJavaArray(decl))
-                packageName = ((Package) s).getName();
-            else
-                packageName = COM_REDHAT_CEYLON_LANGUAGE_PACKAGE;
+            final List<String> packageName = 
+                    Decl.isJavaArray(decl) || 
+                    AbstractTransformer.isJavaInterop(decl) ? 
+                            COM_REDHAT_CEYLON_LANGUAGE_PACKAGE : 
+                                ((Package) s).getName();
             if (packageName.isEmpty() || !packageName.get(0).isEmpty()) {
                 declarationBuilder.select("");
             }
@@ -453,7 +452,7 @@ public class Naming extends NamingBase implements LocalId {
             TypeDeclarationBuilder<?> typeDeclarationBuilder, Scope scope, final boolean last) {
         if (scope instanceof Class 
                 || scope instanceof TypeAlias 
-                || (scope instanceof Constructor && (scope.equals(decl) || !Decl.isLocalNotInitializerScope(scope)))) {
+                || (scope instanceof Constructor && (scope.equals(decl) || !ModelUtil.isLocalNotInitializerScope(scope)))) {
             TypeDeclaration klass = (TypeDeclaration)scope;
             if(klass.isAnonymous() && !klass.isNamed())
                 typeDeclarationBuilder.clear();
@@ -465,9 +464,9 @@ public class Naming extends NamingBase implements LocalId {
                     className = getRealName(klass, NA_WRAPPER_UNQUOTED);
             }
             typeDeclarationBuilder.append(className);
-            if (Decl.isCeylon(klass)) {
+            if (ModelUtil.isCeylonDeclaration(klass)) {
                 if (flags.contains(DeclNameFlag.COMPANION)
-                    && Decl.isLocalNotInitializer(klass)
+                    && ModelUtil.isLocalNotInitializer(klass)
                     && last) {
                     typeDeclarationBuilder.append(IMPL_POSTFIX);
                 } else if (flags.contains(DeclNameFlag.ANNOTATION)
@@ -491,12 +490,12 @@ public class Naming extends NamingBase implements LocalId {
                     className = getRealName(iface, NA_WRAPPER_UNQUOTED);
             }
             typeDeclarationBuilder.append(className);
-            if (Decl.isCeylon(iface)
+            if (ModelUtil.isCeylonDeclaration(iface)
                 && ((decl instanceof Class || decl instanceof Constructor || decl instanceof TypeAlias|| scope instanceof Constructor) 
                         || flags.contains(DeclNameFlag.COMPANION))) {
                 typeDeclarationBuilder.append(IMPL_POSTFIX);
             }
-        } else if (Decl.isLocalNotInitializerScope(scope)) {
+        } else if (ModelUtil.isLocalNotInitializerScope(scope)) {
             if (flags.contains(DeclNameFlag.COMPANION)
                 || !(decl instanceof Interface)) {
                 typeDeclarationBuilder.clear();
@@ -527,7 +526,7 @@ public class Naming extends NamingBase implements LocalId {
         }
         if (!last) {
             if (decl instanceof Interface
-                    && Decl.isCeylon((TypeDeclaration)decl)
+                    && ModelUtil.isCeylonDeclaration((TypeDeclaration)decl)
                     && !flags.contains(DeclNameFlag.COMPANION)) {
                 typeDeclarationBuilder.append('$');
             } else if (decl instanceof Constructor
@@ -647,11 +646,17 @@ public class Naming extends NamingBase implements LocalId {
         // get/is with at least one more letter, no parameter and non-void type
         if(((name.length() >= 4 && name.startsWith("get"))
              || name.length() >= 3 && name.startsWith("is"))
+            //TODO: according to #6921 this isn't correct: we should
+            //      be looking at the number of *required* parameters,
+            //      not the total number of parameters
             && method.getFirstParameterList().getParameters().isEmpty()
             && !AbstractTransformer.isAnything(method.getType()))
             return quote(name);
         // set with one parameter and void type
         if((name.length() >= 4 && name.startsWith("set"))
+            //TODO: according to #6921 this isn't correct: we should
+            //      be looking at the number of *required* parameters,
+            //      not the total number of parameters
            && method.getFirstParameterList().getParameters().size() == 1
            && AbstractTransformer.isAnything(method.getType()))
             return quote(name);
@@ -668,18 +673,18 @@ public class Naming extends NamingBase implements LocalId {
 
     public static String getDefaultedParamMethodName(Declaration decl, Parameter param) {
         if (Decl.isConstructor(decl)) {
-            Constructor constructor = Decl.getConstructor(decl);
+            Constructor constructor = ModelUtil.getConstructor(decl);
             if (Decl.isDefaultConstructor(constructor)) {
-                return compoundName(Decl.getConstructedClass(constructor).getName(), param.getName());
+                return compoundName(ModelUtil.getConstructedClass(constructor).getName(), param.getName());
             } else {
-                return compoundName(Decl.getConstructedClass(constructor).getName(), decl.getName(), param.getName());
+                return compoundName(ModelUtil.getConstructedClass(constructor).getName(), decl.getName(), param.getName());
             }
         } else if (decl instanceof Function) {
             if(decl.isAnonymous())
                 return prefixName(Prefix.$default$, param.getName());
             return compoundName(((Function) decl).getName(), CodegenUtil.getTopmostRefinedDeclaration(param.getModel()).getName());
         } else if (decl instanceof ClassOrInterface ) {
-            if (decl.isToplevel() || Decl.isLocalNotInitializer(decl)) {
+            if (decl.isToplevel() || ModelUtil.isLocalNotInitializer(decl)) {
                 return prefixName(Prefix.$default$, param.getName());
             } else {
                 return prefixName(Prefix.$default$, decl.getName() , param.getName());
@@ -1067,7 +1072,7 @@ public class Naming extends NamingBase implements LocalId {
         } else if (decl instanceof Setter) {
             builder.select(getSetterName(decl.getName()));
         } else if (decl instanceof Function
-                && ((!decl.isParameter() || decl.isShared() || decl.isCaptured())
+                && ((!decl.isParameter() || ModelUtil.isCaptured(decl))
                         // if we want it aliased, it means we're in a constructor and we don't want
                         // the member name ever for parameters, so let's never fall into that branch and skip
                         // to the next one
@@ -1083,6 +1088,11 @@ public class Naming extends NamingBase implements LocalId {
         } 
     }
     
+    public static boolean isJavaInterop(Declaration decl) {
+        return decl instanceof Class 
+            && "java.lang::Types".equals(decl.getQualifiedNameString());
+    }
+    
     private <R> void addNamesForWrapperClass(TypeDeclarationBuilder<R> builder, TypedDeclaration decl, int namingOptions) {
         if ((namingOptions & NA_FQ) != 0) {
             if ((namingOptions & NA_WRAPPER) == 0
@@ -1091,9 +1101,13 @@ public class Naming extends NamingBase implements LocalId {
             }
             List<String> outerNames = null;
             Scope s = decl.getContainer();
+            boolean isInterop = false;
             while (s != null) {
                 if (s instanceof Package) {
-                    final List<String> packageName = ((Package) s).getName();
+                    final List<String> packageName =
+                             isInterop ?
+                                    COM_REDHAT_CEYLON_LANGUAGE_PACKAGE :
+                                    ((Package) s).getName();
                     for (int ii = 0; ii < packageName.size(); ii++) {
                         if (ii == 0 && packageName.get(ii).isEmpty()) {
                             continue;
@@ -1102,10 +1116,12 @@ public class Naming extends NamingBase implements LocalId {
                     }
                     break;
                 } else if (s instanceof ClassOrInterface) {
+                    ClassOrInterface c = (ClassOrInterface) s;
+                    if (isJavaInterop(c)) isInterop = true;
                     if (outerNames == null) {
                         outerNames = new ArrayList<String>(2);
                     }
-                    outerNames.add(getQuotedClassName((ClassOrInterface) s, 0));
+                    outerNames.add(getQuotedClassName(c, 0));
                 } else if (s instanceof TypedDeclaration) {
                     if (outerNames == null) {
                         outerNames = new ArrayList<String>(2);

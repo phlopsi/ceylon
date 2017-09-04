@@ -1,11 +1,16 @@
 package com.redhat.ceylon.compiler.typechecker.analyzer;
 
 import static com.redhat.ceylon.common.ModuleUtil.isMavenModule;
+import static com.redhat.ceylon.compiler.typechecker.parser.CeylonLexer.STRING_LITERAL;
 import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.buildAnnotations;
 import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.formatPath;
+import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.getAnnotation;
+import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.getAnnotationArgument;
+import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.getAnnotationArgumentCount;
 import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.getNativeBackend;
 import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.hasAnnotation;
 import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.name;
+import static com.redhat.ceylon.compiler.typechecker.tree.TreeUtil.setRestrictionArgument;
 import static com.redhat.ceylon.model.typechecker.model.ModelUtil.formatPath;
 import static com.redhat.ceylon.model.typechecker.model.Module.DEFAULT_MODULE_NAME;
 import static com.redhat.ceylon.model.typechecker.model.Module.LANGUAGE_MODULE_NAME;
@@ -13,9 +18,12 @@ import static java.util.Arrays.asList;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+
+import org.antlr.runtime.CommonToken;
 
 import com.redhat.ceylon.cmr.impl.DefaultRepository;
 import com.redhat.ceylon.cmr.impl.MavenRepository;
@@ -82,7 +90,38 @@ public class ModuleVisitor extends Visitor {
     public void setPhase(Phase phase) {
         this.phase = phase;
     }
+    
+    private Map<String,String> constants = new HashMap<String,String>(0);
 
+    @Override
+    public void visit(Tree.AttributeDeclaration that) {
+        Tree.Identifier id = that.getIdentifier();
+        if (id!=null) {
+            String name = id.getText();
+            Tree.SpecifierOrInitializerExpression sie = 
+                    that.getSpecifierOrInitializerExpression();
+            if (sie!=null) {
+                Tree.Expression ex = sie.getExpression();
+                if (ex!=null) {
+                    Tree.Term term = ex.getTerm();
+                    if (term instanceof Tree.StringLiteral) {
+                        String value = term.getText();
+                        constants.put(name, "\"" + value + "\"");
+                    }
+                    else {
+                        ex.addError("not a string literal");
+                    }
+                }
+            }
+        }
+        super.visit(that);
+    }
+    
+    @Override
+    public void visit(Tree.AttributeGetterDefinition that) {
+        that.getBlock().addError("not a constant");
+        super.visit(that);
+    }
     
     @Override
     public void visit(Tree.CompilationUnit that) {
@@ -100,30 +139,52 @@ public class ModuleVisitor extends Visitor {
         return quoted.substring(1, quoted.length()-1);
     }
 
-    private static String getVersionString(Tree.QuotedLiteral quoted, Node that) {
-        if (quoted==null) {
+    private String getVersionString(
+            Tree.QuotedLiteral quoted, 
+            Tree.BaseMemberExpression constantVersion,
+            Node that) {
+        if (constantVersion!=null) {
+            String name = 
+                    constantVersion.getIdentifier().getText();
+            String constVers = constants.get(name);
+            if (constVers==null) {
+                constantVersion.addError("constant not defined");
+                return "0";
+            }
+            else {
+                return toVersionString(constantVersion, constVers);
+            }
+        }
+        else if (quoted!=null) {
+            return toVersionString(quoted, quoted.getText());
+        }
+        else {
             that.addError("missing version");
             return "0";
         }
+    }
+
+    private static String toVersionString(Node node, String versionString) {
+        for (int i=0; i<versionString.length();) {
+            int codePoint = versionString.codePointAt(i);
+            i += Character.charCount(codePoint);
+            if (Character.isWhitespace(codePoint)) {
+                node.addError("module version may not contain whitespace");
+                break;
+            }
+        }
+        if (versionString.length()<2) {
+            return "";
+        }
         else {
-            String versionString = quoted.getText();
-            for (int i=0; i<versionString.length();) {
-                int codePoint = versionString.codePointAt(i);
-                i += Character.charCount(codePoint);
-                if (Character.isWhitespace(codePoint)) {
-                    quoted.addError("module version may not contain whitespace");
-                    break;
-                }
+            if (versionString.charAt(0)=='\'') {
+                node.addError("module version should be double-quoted");
             }
-            if (versionString.length()<2) {
-                return "";
+            String version = removeQuotes(versionString);
+            if (version.isEmpty()) {
+                node.addError("empty module version");
             }
-            else {
-                if (versionString.charAt(0)=='\'') {
-                    quoted.addError("module version should be double-quoted");
-                }
-                return removeQuotes(versionString);
-            }
+            return version;
         }
     }
 
@@ -156,13 +217,23 @@ public class ModuleVisitor extends Visitor {
 
     @Override
     public void visit(Tree.ModuleDescriptor that) {
-        moduleBackends = 
-                getNativeBackend(that.getAnnotationList(), 
-                        that.getUnit());
+        Tree.AnnotationList al = that.getAnnotationList();
+        Unit u = unit.getUnit();
+        moduleBackends = getNativeBackend(al, u);
         super.visit(that);
         if (phase==Phase.SRC_MODULE) {
-            String version = getVersionString(that.getVersion(), that);
+            String version = 
+                    getVersionString(
+                            that.getVersion(), 
+                            null, 
+                            that);
             Tree.ImportPath importPath = that.getImportPath();
+            for (Tree.Identifier id: importPath.getIdentifiers()) {
+                if (containsDiscouragedChar(id)) {
+                    id.addUsageWarning(Warning.packageName, 
+                            "all-lowercase ASCII module names are recommended");
+                }
+            }
             List<String> name = getNameAsList(importPath);
             if (pkg.getNameAsString().isEmpty()) {
                 that.addError("module descriptor encountered in root source directory");
@@ -173,8 +244,7 @@ public class ModuleVisitor extends Visitor {
             else {
                 String initialName = name.get(0);
                 Backends unitBackends = 
-                        unit.getUnit()
-                            .getSupportedBackends();
+                        u.getSupportedBackends();
                 if (initialName.equals(DEFAULT_MODULE_NAME)) {
                     importPath.addError("reserved module name: 'default'");
                 }
@@ -185,13 +255,13 @@ public class ModuleVisitor extends Visitor {
                 else if (!moduleBackends.none()
                         && moduleBackends.header()) {
                     that.addError("missing backend argument for native annotation on module: "
-                        + formatPath(that.getImportPath().getIdentifiers()));
+                        + formatPath(importPath.getIdentifiers()));
                 }
                 else if (!moduleBackends.none()
                         && !unitBackends.none()
                         && !unitBackends.supports(moduleBackends)) {
                     that.addError("module not meant for this backend: "
-                        + formatPath(that.getImportPath().getIdentifiers()));
+                        + formatPath(importPath.getIdentifiers()));
                 }
                 else {
                     if (initialName.equals("ceylon")) {
@@ -208,8 +278,13 @@ public class ModuleVisitor extends Visitor {
                                     name, version);
                     importPath.setModel(mainModule);
                     if (!completeOnlyAST) {
-                        mainModule.setUnit(unit.getUnit());
+                        mainModule.setUnit(u);
                         mainModule.setVersion(version);
+//                        if (hasAnnotation(al, "label", u)) {
+//                            mainModule.setLabel(getAnnotationArgument(
+//                                    getAnnotation(al, "label", u), 
+//                                    0, u));
+//                        }
                     }
                     String nameString = 
                             formatPath(importPath.getIdentifiers());
@@ -225,15 +300,26 @@ public class ModuleVisitor extends Visitor {
                                 mainModule, that);
                         mainModule.setAvailable(true);
                         mainModule.getAnnotations().clear();
-                        buildAnnotations(that.getAnnotationList(), 
+                        buildAnnotations(al, 
                                 mainModule.getAnnotations());
                         mainModule.setNativeBackends(moduleBackends);
-                        if(that.getArtifact() != null)
-                            mainModule.setArtifactId(getNameString(that.getArtifact()));
-                        if(that.getGroupImportPath() != null)
-                            mainModule.setGroupId(formatPath(that.getGroupImportPath().getIdentifiers()));
-                        else if(that.getGroupQuotedLiteral() != null)
-                            mainModule.setGroupId(getNameString(that.getGroupQuotedLiteral()));
+                        Tree.QuotedLiteral classifier = that.getClassifier();
+                        if (classifier != null) {
+                            mainModule.setClassifier(getNameString(classifier));
+                            classifier.addUnsupportedError("classifiers not yet supported");
+                        }
+                        Tree.QuotedLiteral artifact = that.getArtifact();
+                        if (artifact != null) {
+                            mainModule.setArtifactId(getNameString(artifact));
+                        }
+                        Tree.ImportPath groupImportPath = that.getGroupImportPath();
+                        Tree.QuotedLiteral groupQuotedLiteral = that.getGroupQuotedLiteral();
+                        if (groupImportPath != null) {
+                            mainModule.setGroupId(formatPath(groupImportPath.getIdentifiers()));
+                        }
+                        else if (groupQuotedLiteral != null) {
+                            mainModule.setGroupId(getNameString(groupQuotedLiteral));
+                        }
                     }
                 }
             }
@@ -255,12 +341,27 @@ public class ModuleVisitor extends Visitor {
         }
         moduleBackends = Backends.ANY;
     }
+
+    private static boolean containsDiscouragedChar(Tree.Identifier id) {
+        for (char ch: id.getText().toCharArray()) {
+            if ((ch<'a' || ch>'z') && (ch<'0' || ch>'9')) {
+                return true;
+            }
+        }
+        return false;
+    }
     
     @Override
     public void visit(Tree.PackageDescriptor that) {
         super.visit(that);
         if (phase==Phase.REMAINING) {
             Tree.ImportPath importPath = that.getImportPath();
+            for (Tree.Identifier id: importPath.getIdentifiers()) {
+                if (containsDiscouragedChar(id)) {
+                    id.addUsageWarning(Warning.packageName, 
+                            "all-lowercase ASCII package names are recommended");
+                }
+            }
             List<String> name = getNameAsList(importPath);
             if (pkg.getNameAsString().isEmpty()) {
                 that.addError("package descriptor encountered in root source directory");
@@ -301,18 +402,39 @@ public class ModuleVisitor extends Visitor {
                                 pkg.getNameAsString() + "'", 
                                 8000);
                 }
+                
+                Tree.AnnotationList al = 
+                        that.getAnnotationList();
+                
                 if (!completeOnlyAST) {
-                    Tree.AnnotationList al = 
-                            that.getAnnotationList();
-                    if (hasAnnotation(al, "shared", u)) {
-                        pkg.setShared(true);
-                    }
-                    else {
-                        pkg.setShared(false);
-                    }
+                    pkg.setShared(hasAnnotation(al, "shared", u));
                     pkg.getAnnotations().clear();
                     buildAnnotations(al, pkg.getAnnotations());
                 }
+                
+            
+                if (hasAnnotation(al, "restricted", u)) {
+                    Tree.Annotation ann = getAnnotation(al, "restricted", u);
+                    int len = getAnnotationArgumentCount(ann);
+                    List<String> modules = new ArrayList<String>(len);
+                    for (int i=0; i<len; i++) {
+                        setRestrictionArgument(ann, i, u);
+                        String arg = getAnnotationArgument(ann, i, u);
+                        if (arg!=null) {
+                            modules.add(arg);
+                        }
+                    }
+                    
+                    if (!completeOnlyAST) {
+                        if (modules.isEmpty()) {
+                            pkg.setShared(false);
+                        }
+                        else {
+                            pkg.setRestrictions(modules);
+                        }
+                    }
+                }
+
             }
         }
     }
@@ -321,7 +443,16 @@ public class ModuleVisitor extends Visitor {
     public void visit(Tree.ImportModule that) {
         super.visit(that);
         String version = 
-                getVersionString(that.getVersion(), that);
+                getVersionString(
+                        that.getVersion(),
+                        that.getConstantVersion(),
+                        that);
+        if (that.getVersion()==null 
+                && version!=null) {
+            that.setVersion(new Tree.QuotedLiteral(
+                    new CommonToken(STRING_LITERAL, 
+                            "\"" + version + "\"")));
+        }
         List<String> name;
         Node node;
 
@@ -350,6 +481,13 @@ public class ModuleVisitor extends Visitor {
             if (artifact!=null) {
                 name = new ArrayList<String>(name);
                 String nameString = getNameString(artifact);
+                name.add("");
+                name.addAll(asList(nameString.split("\\.")));
+            }
+            Tree.QuotedLiteral classifier = 
+                    that.getClassifier();
+            if (classifier!=null) {
+                String nameString = getNameString(classifier);
                 name.add("");
                 name.addAll(asList(nameString.split("\\.")));
             }

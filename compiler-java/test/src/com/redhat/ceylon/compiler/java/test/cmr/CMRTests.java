@@ -89,6 +89,7 @@ import com.redhat.ceylon.javax.tools.JavaCompiler.CompilationTask;
 import com.redhat.ceylon.javax.tools.JavaFileObject;
 import com.redhat.ceylon.javax.tools.StandardJavaFileManager;
 import com.redhat.ceylon.javax.tools.ToolProvider;
+import com.redhat.ceylon.javax.tools.Diagnostic.Kind;
 import com.redhat.ceylon.langtools.source.util.TaskEvent;
 import com.redhat.ceylon.langtools.source.util.TaskListener;
 import com.redhat.ceylon.model.cmr.JDKUtils;
@@ -747,7 +748,8 @@ public class CMRTests extends CompilerTests {
                 collector, 
                 "modules/ceylonAetherConflict/module.ceylon", "modules/ceylonAetherConflict/foo.ceylon");
         assertEquals(Boolean.TRUE, ceylonTask.call());
-        compareErrors(collector.get(Diagnostic.Kind.WARNING), 
+        compareErrors(collector.get(Diagnostic.Kind.WARNING),
+                new CompilerError(Diagnostic.Kind.WARNING, null, 21, "all-lowercase ASCII module names are recommended"),
                 new CompilerError(Diagnostic.Kind.WARNING, null, 21, "source code imports two different versions of similar modules 'org.apache.httpcomponents.httpclient/4.3.2' and 'org.apache.httpcomponents:httpclient/4.3.3'")
         );
     }
@@ -1695,9 +1697,10 @@ public class CMRTests extends CompilerTests {
         ModulesRetriever modulesRetriever = new ModulesRetriever(compilerTask.getContext());
         compilerTask.setTaskListener(modulesRetriever);
         Boolean result = compilerTask.call();
-        Assert.assertEquals(Boolean.FALSE, result);
-        compareErrors(collector.get(Diagnostic.Kind.ERROR),
-                new CompilerError(2, "the module import should not be overridden, since it is explicitly imported by a project source module"));
+        Assert.assertEquals(Boolean.TRUE, result);
+        compareErrors(collector.get(Diagnostic.Kind.WARNING),
+                new CompilerError(Kind.WARNING, null, 1, "all-lowercase ASCII module names are recommended"),
+                new CompilerError(Kind.WARNING, null, 2, "project source module import is overridden in module overrides file: 'a/2' overrides 'a/1'"));
         
         assert(modulesRetriever.modules != null);
         Module a = modulesRetriever.modules.get("a");
@@ -1753,7 +1756,7 @@ public class CMRTests extends CompilerTests {
         Assert.assertEquals(Boolean.FALSE, result);
         
         compareErrors(collector.get(Diagnostic.Kind.ERROR),
-                new CompilerError(2, "imported package is not shared: 'b.hidden' is not annotated 'shared' in 'b'"));
+                new CompilerError(2, "imported package is not visible: package 'b.hidden' is not shared by module 'b'"));
     }
 
     private ModuleImport getModuleImport(Module m, String name) {
@@ -1830,8 +1833,8 @@ public class CMRTests extends CompilerTests {
     @Test
     public void testMdlNullVersion() throws IOException{
         assertErrors("modules/nullVersion/module",
-                new CompilerError(21, "missing version"),
-                new CompilerError(21, "cannot find module artifact 'null-0(.car|.jar)'\n  \t- dependency tree: 'com.redhat.ceylon.compiler.java.test.cmr.modules.nullVersion/1' -> 'null/0'")
+                new CompilerError(1, "missing version"),
+                new CompilerError(1, "cannot find module artifact 'null-0(.car|.jar)'\n  \t- dependency tree: 'com.redhat.ceylon.compiler.java.test.cmr.modules.nullVersion/1' -> 'null/0'")
                 );
     }
     
@@ -1868,4 +1871,9 @@ public class CMRTests extends CompilerTests {
         assertEquals(Boolean.TRUE, ceylonTask.call());
     }
 
+    @Test
+    public void test7062(){
+        compile(Arrays.asList("-overrides", "test/src/com/redhat/ceylon/compiler/java/test/cmr/modules/bug7062/overrides.xml"), 
+                "modules/bug7062/run.ceylon");
+    }
 }

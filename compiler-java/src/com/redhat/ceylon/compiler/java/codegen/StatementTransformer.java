@@ -197,7 +197,7 @@ public class StatementTransformer extends AbstractTransformer {
                 }
             }
             popBlockImports(block);
-            result = (List<JCStatement>)v.getResult().toList();
+            result = (List<JCStatement>) v.getResult().toList();
             Runnable r = onEndBlock.get(block);
             if (r != null) {
                 r.run();
@@ -217,7 +217,7 @@ public class StatementTransformer extends AbstractTransformer {
         return result;
     }
     
-    private java.util.List<Tree.ImportList> blockImports = new ArrayList();
+    private java.util.List<Tree.ImportList> blockImports = new ArrayList<>();
     
     private void pushBlockImports(Tree.Block block) {
         Tree.ImportList importList = block.getImportList();
@@ -929,13 +929,13 @@ public class StatementTransformer extends AbstractTransformer {
         @Override
         public List<JCStatement> getResult() {
             if (definitelyNotSatisfied(conditions)) {
-                return List.<JCTree.JCStatement>of(makeThrowAssertionFailure(this.getConditionTransformer(conditions.get(0))));
+                return List.<JCStatement>of(makeThrowAssertionFailure(this.getConditionTransformer(conditions.get(0))));
             }
             List<JCStatement> stmts = transformList(conditions);
             at(this.ass);
             ListBuffer<JCStatement> result = new ListBuffer<JCStatement>();
             result.appendList(varDecls);
-            current().defs((List)fieldDecls.toList());
+            current().defs(fieldDecls.toList());
             result.appendList(stmts);
 
             return result.toList();
@@ -1074,7 +1074,7 @@ public class StatementTransformer extends AbstractTransformer {
                 type = var.getType();
                 toTypeBoxed = !CodegenUtil.isUnBoxed(var.getDeclarationModel());
             } else if (varOrDes instanceof Tree.Destructure) {
-                type = ((Tree.Destructure)varOrDes).getType();
+                type = null;
                 toTypeBoxed = false;
             } else {
                 throw BugException.unhandledNodeCase(varOrDes);
@@ -1624,8 +1624,8 @@ public class StatementTransformer extends AbstractTransformer {
     private class EqualityOpBooleanCond implements Cond {
         private final Tree.BooleanCondition cond;
         private final VarTrans var;
-        private final Tree.BinaryOperatorExpression op;
-        private final boolean negated;
+//        private final Tree.BinaryOperatorExpression op;
+//        private final boolean negated;
         private final boolean negate;
         private final SyntheticName leftVarName;
         private final SyntheticName rightVarName;
@@ -1634,7 +1634,7 @@ public class StatementTransformer extends AbstractTransformer {
         private EqualityOpBooleanCond(Tree.BooleanCondition booleanCondition, boolean negated, final Tree.BinaryOperatorExpression op) {
             super();
             this.cond = booleanCondition;
-            this.op = op;
+//            this.op = op;
             this.leftVarName = naming.alias("lhs");
             this.rightVarName = naming.alias("rhs");
             boolean needsNegating = false;
@@ -1648,7 +1648,7 @@ public class StatementTransformer extends AbstractTransformer {
             } else {
                 throw BugException.unhandledNodeCase(op);
             }
-            this.negated = negated;
+//            this.negated = negated;
             this.negate = negated ^ needsNegating;
             transformed.setLeft(leftVarName.makeIdent());
             transformed.setRight(rightVarName.makeIdent());
@@ -1745,16 +1745,16 @@ public class StatementTransformer extends AbstractTransformer {
             return var;
         }
         
-        /** Is it a {@code ! ... == ...} or {@code ! ... != ...} condition .*/
-        public boolean isNegated() {
-            return negated;
-        }
-        
-        /** Is it a {@code ... != ...} or {@code ! ... != ...} condition .*/
-        public boolean isNotEqual() {
-            return op instanceof Tree.NotEqualOp;
-        }
-        
+//        /** Is it a {@code ! ... == ...} or {@code ! ... != ...} condition .*/
+//        public boolean isNegated() {
+//            return negated;
+//        }
+//        
+//        /** Is it a {@code ... != ...} or {@code ! ... != ...} condition .*/
+//        public boolean isNotEqual() {
+//            return op instanceof Tree.NotEqualOp;
+//        }
+//        
         public JCExpression getLeftName() {
             JCExpression result = leftVarName.makeIdent();
             if (getLeftBoxing() == BoxingStrategy.UNBOXED) {
@@ -1774,7 +1774,7 @@ public class StatementTransformer extends AbstractTransformer {
     private class WithinOpBooleanCond implements Cond {
 
         private final Tree.BooleanCondition cond;
-        private final Tree.WithinOp op;
+//        private final Tree.WithinOp op;
         private final SyntheticName leftVarName;
         private final SyntheticName middleVarName;
         private final SyntheticName rightVarName;
@@ -1785,7 +1785,7 @@ public class StatementTransformer extends AbstractTransformer {
         public WithinOpBooleanCond(Tree.BooleanCondition booleanCondition, boolean negated, Tree.WithinOp op) {
             super();
             this.cond = booleanCondition;
-            this.op = op;
+//            this.op = op;
             this.negate = negated;
             this.leftVarName = naming.alias("lhs");
             this.middleVarName = naming.alias("middle");
@@ -1867,10 +1867,10 @@ public class StatementTransformer extends AbstractTransformer {
         
     }
 
-    private Type actualType(Tree.TypedDeclaration decl) {
-        return decl.getType().getTypeModel();
-    }
-    
+//    private Type actualType(Tree.TypedDeclaration decl) {
+//        return decl.getType().getTypeModel();
+//    }
+//    
     List<JCStatement> transform(Tree.ForStatement stmt) {
         Tree.Term iterableTerm = ExpressionTransformer.eliminateParens(stmt.getForClause().getForIterator().getSpecifierExpression().getExpression().getTerm());
         Tree.Term baseIterable = iterableTerm;
@@ -4281,7 +4281,7 @@ public class StatementTransformer extends AbstractTransformer {
 
     /**
      * Determines whether the {@code CatchClause}s contain any 
-     * intersections or parameterised exception types. If so, the
+     * intersections or parameterized exception types. If so, the
      * we have to transform the {@code CatchClause}s using 
      * {@link #transformCatchesIfElseIf(java.util.List)}, otherwise we can
      * let the JVM do the heavy lifting an use 
@@ -4292,8 +4292,9 @@ public class StatementTransformer extends AbstractTransformer {
             Type type = catchClause.getCatchVariable().getVariable().getType().getTypeModel();
             if (isOrContainsError(type)) {
                 return false;
-            }
-            if (type.getDeclaration().isParameterized()) {
+            } else if (type.isTypeParameter())  {
+                return false;
+            } else if (type.getDeclaration().isParameterized()) {
                 // e.g. E<T>
                 return false;
             } else if (typeFact().isIntersection(type)) {
@@ -4396,18 +4397,19 @@ public class StatementTransformer extends AbstractTransformer {
      * {@code catch} clause to have the most specific Java Exception type
      * applicable to all the Ceylon Exception types in the list.</p>
      * 
-     * <p><strong>Note:</strong> This method can return parameterised types
+     * <p><strong>Note:</strong> This method can return parameterized types
      * whose parameters are taken from their declaration (i.e. there's 
      * no corresponding Java type parameter in scope). That should be OK, 
      * because we're only interested in catching the raw type.</p>
      */
     private Type intersectionOfCatchClauseTypes(
             java.util.List<Tree.CatchClause> catchClauses) {
-        Type result = typeFact().getNothingType();
+        java.util.List<Type> list = new ArrayList<Type>(catchClauses.size());
         for (Tree.CatchClause catchClause : catchClauses) {
             Type pt = catchClause.getCatchVariable().getVariable().getType().getTypeModel().resolveAliases();
-            result = ModelUtil.unionType(result, exceptionSupertype(pt), typeFact());
+            ModelUtil.addToUnion(list, exceptionSupertype(pt));
         }
+        Type result = ModelUtil.union(list, typeFact());
         if (typeFact().isUnion(result)) {
             return result.getSupertype(typeFact().getThrowableDeclaration());
         }
@@ -4415,26 +4417,35 @@ public class StatementTransformer extends AbstractTransformer {
     }
 
     private Type exceptionSupertype(Type pt) {
-        Type result = typeFact().getNothingType();
         if (typeFact().isUnion(pt)) {
+            java.util.List<Type> list = new ArrayList<Type>(pt.getCaseTypes().size());
             for (Type t : pt.getCaseTypes()) {
-                result = ModelUtil.unionType(result, exceptionSupertype(t), typeFact());
+                ModelUtil.addToUnion(list, exceptionSupertype(t));
             }
+            return ModelUtil.union(list, typeFact());
         } else if (typeFact().isIntersection(pt)) {
+            java.util.List<Type> list = new ArrayList<Type>(pt.getSatisfiedTypes().size());
             for (Type t : pt.getSatisfiedTypes()) {
                 if (t.isSubtypeOf(typeFact().getThrowableType())) {
-                    result = ModelUtil.unionType(result, exceptionSupertype(t), typeFact());
+                    ModelUtil.addToUnion(list, exceptionSupertype(t));
                 }
             }
+            return ModelUtil.union(list, typeFact());
+        } else if (pt.isTypeParameter()) {
+            return exceptionSupertype(ModelUtil.intersectionOfSupertypes(pt.getDeclaration()));
         } else if (pt.isSubtypeOf(typeFact().getThrowableType())) {
             if (pt.getDeclaration().isParameterized()) {
                 // We do this to avoid ending up with a union ExG<Foo>|ExG<Bar>
                 // when we're actually going to go raw, so ExG would be fine
                 return pt.getDeclaration().getType();
             }
-            return pt;
-        } 
-        return result;
+            else {
+                return pt;
+            }
+        }
+        else {
+            return typeFact().getNothingType();
+        }
     }
     
     private int transformLocalFieldDeclFlags(Tree.AttributeDeclaration cdecl) {
@@ -4625,9 +4636,11 @@ public class StatementTransformer extends AbstractTransformer {
         public abstract JCStatement transformSwitch(Node node, Tree.SwitchClause switchClause, Tree.SwitchCaseList caseList, 
                                                     String tmpVar, Tree.Term outerExpression, Type expectedType);
         
-        protected boolean isDefinitelyReturns(CaseClause caseClause) {
-            if(caseClause.getBlock() != null)
-                return caseClause.getBlock().getDefinitelyReturns();
+        protected boolean isDefinitelyReturnsOrBreaks(CaseClause caseClause) {
+            Tree.Block block = caseClause.getBlock();
+            if(block != null)
+                return block.getDefinitelyReturns()
+                    || block.getDefinitelyBreaksOrContinues();
             // expressions don't return
             return false;
         }
@@ -4687,7 +4700,7 @@ public class StatementTransformer extends AbstractTransformer {
                 Tree.Term term = exprs.get(exprs.size()-1).getTerm();
                 JCBlock block = transformCaseClauseBlock(caseClause, tmpVar, outerExpression, expectedType);
                 List<JCStatement> stmts = List.<JCStatement>nil();
-                if (!isDefinitelyReturns(caseClause)) {
+                if (!isDefinitelyReturnsOrBreaks(caseClause)) {
                     stmts = stmts.prepend(make().Break(label));
                 }
                 stmts = stmts.prepend(block);
@@ -4799,13 +4812,18 @@ public class StatementTransformer extends AbstractTransformer {
 
         @Override
         protected java.util.List<Tree.CaseClause> getCaseClauses(Tree.SwitchClause switchClause, Tree.SwitchCaseList caseList) {
+            java.util.List<CaseClause> list = super.getCaseClauses(switchClause, caseList);
+            
+            if (hasNonDisjointCase(caseList)) {
+                return list;
+            }
+            
             // If all the cases are "case (is ...)" we can try to avoid 
             // the expense of testing reified is by putting all the cheap tests first
             // We respect the relative order of all the cheap cases and all 
             // the expensive cases though on the basis that that might be a 
             // hint
             // about which are more common
-            java.util.List<CaseClause> list = super.getCaseClauses(switchClause, caseList);
             java.util.ArrayList<CaseClause> cheap = new ArrayList<CaseClause>(list.size());
             int lastCheap = 0;
             // The dummy isn't actually used for anything, it just has to be non-null
@@ -4822,11 +4840,15 @@ public class StatementTransformer extends AbstractTransformer {
                             getSwitchExpressionType(switchClause));
                 } else if (item instanceof Tree.MatchCase) {
                     // will be primitive equality test
-                    for (Tree.Expression expr : ((Tree.MatchCase) item).getExpressionList().getExpressions()) {
+                    Tree.MatchList matchList = ((Tree.MatchCase) item).getExpressionList();
+                    for (Tree.Expression expr : matchList.getExpressions()) {
                         if (isNull(expr.getTypeModel())) {
                             containsNull = clause;
                             continue outer;
                         }
+                    }
+                    for (Tree.Type type : matchList.getTypes()) {
+                        isCheap=false; //TODO!!!!!!!!
                     }
                     isCheap = true;
                 } else {
@@ -4843,6 +4865,23 @@ public class StatementTransformer extends AbstractTransformer {
                 cheap.add(0, containsNull);
             }
             return cheap;
+        }
+
+        private boolean hasNonDisjointCase(Tree.SwitchCaseList caseList) {
+            class WarningVisitor extends Visitor {
+                boolean found = false;
+                @Override
+                public void visit(Tree.Body that) {}
+                @Override
+                public void visit(Tree.CaseClause that) {
+                    if (that.getOverlapping()) {
+                        found = true;
+                    }
+                }
+            }
+            WarningVisitor wv = new WarningVisitor();
+            wv.visit(caseList);
+            return wv.found;
         }
         
         @Override
@@ -4956,7 +4995,12 @@ public class StatementTransformer extends AbstractTransformer {
             boolean canUseSwitch = true;
             caseStmts: for (Tree.CaseClause clause : caseList.getCaseClauses()) {
                 if (clause.getCaseItem() instanceof Tree.MatchCase) {
-                    java.util.List<Expression> caseExprs = ((Tree.MatchCase)clause.getCaseItem()).getExpressionList().getExpressions();
+                    Tree.MatchList matchList = ((Tree.MatchCase)clause.getCaseItem()).getExpressionList();
+                    if (!matchList.getTypes().isEmpty()) {
+                        canUseSwitch = false;
+                        break caseStmts;
+                    }
+                    java.util.List<Expression> caseExprs = matchList.getExpressions();
                     caseExpr: for (Tree.Expression expr : caseExprs) {
                         Tree.Term e = ExpressionTransformer.eliminateParens(expr);
                         if (e instanceof Tree.StringLiteral
@@ -4994,7 +5038,12 @@ public class StatementTransformer extends AbstractTransformer {
                         if (getSingletonNullCase(clause) != null) {
                             hasSingletonNullCase = true;
                         }
-                        java.util.List<Expression> caseExprs = ((Tree.MatchCase)clause.getCaseItem()).getExpressionList().getExpressions();
+                        Tree.MatchList matchList = ((Tree.MatchCase)clause.getCaseItem()).getExpressionList();
+                        if (!matchList.getTypes().isEmpty()) {
+                            canUseIfElseSwitch = false;
+                            break caseStmts;
+                        }
+                        java.util.List<Expression> caseExprs = matchList.getExpressions();
                         caseExpr: for (Tree.Expression expr : caseExprs) {
                             Tree.Term e = ExpressionTransformer.eliminateParens(expr);
                             if (e instanceof Tree.StringLiteral
@@ -5036,7 +5085,8 @@ public class StatementTransformer extends AbstractTransformer {
 
     private boolean isSwitchAllMatchCases(Tree.SwitchCaseList caseList) {
         for (Tree.CaseClause caseClause : caseList.getCaseClauses()) {
-            if (!(caseClause.getCaseItem() instanceof Tree.MatchCase)) {
+            if (!(caseClause.getCaseItem() instanceof Tree.MatchCase)
+                    || !((Tree.MatchCase) caseClause.getCaseItem()).getExpressionList().getTypes().isEmpty()) {
                 return false;
             }
         }
@@ -5048,6 +5098,40 @@ public class StatementTransformer extends AbstractTransformer {
             Tree.Term outerExpression, Type expectedType, Tree.MatchCase matchCase,
             JCStatement last, Type switchType, boolean primitiveSelector) {
         at(matchCase);
+        
+        JCVariableDecl decl2 = null;
+        Substitution prevSubst2 = null;
+        if (matchCase.getVariable()!=null) {
+         // Use the type of the variable, which is more precise than the type we test for.
+            Type varType = matchCase.getVariable().getDeclarationModel().getType();
+            
+            String name = matchCase.getVariable().getIdentifier().getText();
+            TypedDeclaration varDecl = matchCase.getVariable().getDeclarationModel();
+
+            Naming.SyntheticName tmpVarName = selectorAlias;
+            Name substVarName = naming.aliasName(name);
+
+            // Want raw type for instanceof since it can't be used with generic types
+            JCExpression rawToTypeExpr = makeJavaType(varType, JT_NO_PRIMITIVES | JT_RAW);
+
+            // Substitute variable with the correct type to use in the rest of the code block
+            
+            JCExpression tmpVarExpr = at(matchCase).TypeCast(rawToTypeExpr, tmpVarName.makeIdent());
+            JCExpression toTypeExpr;
+            if (isCeylonBasicType(varType) && varDecl.getUnboxed() == true) {
+                toTypeExpr = makeJavaType(varType);
+                tmpVarExpr = unboxType(tmpVarExpr, varType);
+            } else {
+                toTypeExpr = makeJavaType(varType, JT_NO_PRIMITIVES);
+            }
+            
+            // The variable holding the result for the code inside the code block
+            decl2 = at(matchCase).VarDef(make().Modifiers(FINAL), substVarName, toTypeExpr, tmpVarExpr);
+
+            // Prepare for variable substitution in the following code block
+            prevSubst2 = naming.addVariableSubst(varDecl , substVarName.toString());
+
+        }
         
         JCExpression tests = null;
         java.util.List<Tree.Expression> expressions = matchCase.getExpressionList().getExpressions();
@@ -5082,7 +5166,6 @@ public class StatementTransformer extends AbstractTransformer {
                     selectorExpr = selectorAlias.makeIdent();
                 }
                 if (term instanceof Tree.Tuple) {
-                    
                     if (term.getTypeModel().isEmpty()) {
                         test = make().TypeTest(selectorAlias.makeIdent(), 
                                 makeJavaType(typeFact().getEmptyType(), JT_RAW));
@@ -5093,17 +5176,32 @@ public class StatementTransformer extends AbstractTransformer {
                                         make().QualIdent(syms().ceylonTupleType.tsym)),
                                 test);
                     }
+                } else if (term.getTypeModel().isString()) {
+                    test = make().Apply(null, makeSelect(selectorExpr, "equals"), List.<JCExpression>of(transformedExpression));
                 } else {
                     test = make().Binary(JCTree.Tag.EQ, selectorExpr, transformedExpression);
                 }
             }
-            if(tests == null)
+            if(tests == null) {
                 tests = test;
-            else if (isNull(term.getTypeModel())) {
+            } else if (isNull(term.getTypeModel())) {
                 // ensure we do any null check as the first operation in the ||-ed expression
                 tests = make().Binary(JCTree.Tag.OR, test, tests);
             } else {
                 tests = make().Binary(JCTree.Tag.OR, tests, test);
+            }
+        }
+        
+        java.util.List<Tree.Type> types = matchCase.getExpressionList().getTypes();
+        for(Tree.Type caseType : types){
+            // note: There's no point using makeOptimizedTypeTest() because cases are disjoint
+            // anyway and the cheap cases get evaluated first.
+            Type type = caseType.getTypeModel();
+            JCExpression cond = makeTypeTest(null, selectorAlias, type, type);
+            if(tests == null) {
+                tests = cond;
+            } else {
+                tests = make().Binary(JCTree.Tag.OR, tests, cond);
             }
         }
         
@@ -5113,8 +5211,20 @@ public class StatementTransformer extends AbstractTransformer {
             prevSubst = naming.addVariableSubst(switchClause.getSwitched().getVariable().getDeclarationModel(), selectorAlias.toString());
         }
         
-        JCBlock block = transformCaseClauseBlock(caseClause, tmpVar, outerExpression, expectedType);
+        JCBlock block;
+        if (decl2!=null) {
+            List<JCStatement> stats = List.<JCStatement> of(decl2);
+            stats = stats.appendList(transformCaseClause(caseClause, tmpVar, outerExpression, expectedType));
+            block = at(matchCase).Block(0, stats);
+        }
+        else {
+            block = transformCaseClauseBlock(caseClause, tmpVar, outerExpression, expectedType);
+        }
         
+        if (prevSubst2 != null) {
+            // Deactivate the above variable substitution
+            prevSubst2.close();
+        }
         if (prevSubst != null) {
             // Deactivate the above variable substitution
             prevSubst.close();

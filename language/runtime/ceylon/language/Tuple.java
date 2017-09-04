@@ -11,6 +11,7 @@ import java.lang.ref.SoftReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import com.redhat.ceylon.common.NonNull;
 import com.redhat.ceylon.compiler.java.Util;
 import com.redhat.ceylon.compiler.java.metadata.Annotation;
 import com.redhat.ceylon.compiler.java.metadata.Annotations;
@@ -76,7 +77,6 @@ import ceylon.language.serialization.ReachableReference;
 @NativeAnnotation$annotation$(backends={})
 public final class Tuple<Element, First extends Element, 
                 Rest extends Sequential<? extends Element>>
-//        extends BaseSequence<Element>
         implements Sequence<Element>, Serializable, 
                    ReifiedType, java.io.Serializable {
     
@@ -107,7 +107,7 @@ public final class Tuple<Element, First extends Element,
      * array will <strong>never</strong> be modified after the call)
      */
     @SuppressWarnings("unchecked")
-    @Ignore
+    @Ignore(handWritten = true)
     public Tuple(@Ignore TypeDescriptor $reifiedElement, 
             java.lang.Object[] array, 
             Sequential<? extends Element> rest, 
@@ -153,7 +153,7 @@ public final class Tuple<Element, First extends Element,
         this($reifiedElement, makeArray(first, rest), makeRest(rest));
     }
     
-    @Ignore
+    @Ignore(handWritten = true)
     private Tuple(TypeDescriptor $reifiedElement, java.lang.Object[] array,
             Sequential<? extends Element> rest) {
         this($reifiedElement, array, rest, false);
@@ -186,7 +186,7 @@ public final class Tuple<Element, First extends Element,
     }
     
     @SuppressWarnings("unchecked")
-    @Ignore
+    @Ignore(handWritten = true)
     public Tuple(TypeDescriptor $reifiedElement, 
             java.lang.Object[] elements) {
         this($reifiedElement, elements, 
@@ -450,6 +450,11 @@ public final class Tuple<Element, First extends Element,
         }
     }
     
+    @SuppressWarnings("unchecked")
+    private Sequential<? extends Element> getEmptyTuple() {
+        return (Sequential<? extends Element>) empty_.get_();
+    }
+    
     @Annotations({
             @Annotation("shared"),
             @Annotation("actual")})
@@ -462,11 +467,6 @@ public final class Tuple<Element, First extends Element,
                 span(Integer.instance(0), to);
     }
 
-    @SuppressWarnings("unchecked")
-	private Sequential<? extends Element> getEmptyTuple() {
-        return (Sequential<? extends Element>) empty_.get_();
-    }
-    
     @Annotations({
             @Annotation("shared"),
             @Annotation("actual")})
@@ -474,7 +474,10 @@ public final class Tuple<Element, First extends Element,
     @TypeInfo("ceylon.language::Sequential<Element>")
     public final ceylon.language.Sequential<? extends Element> 
     spanFrom(@Name("from") final ceylon.language.Integer from) {
-        return span(from, Integer.instance(getSize()));
+        long size = getSize();
+        return from.longValue() >= size ? 
+                getEmptyTuple() : 
+                span(from, Integer.instance(size-1));
     }
     
     @Annotations({
@@ -482,6 +485,7 @@ public final class Tuple<Element, First extends Element,
             @Annotation("actual")})
     @Override
     @TypeInfo("ceylon.language::Tuple<Element,First,Rest>")
+    @NonNull
     public final Tuple<Element, ? extends First, ? extends Rest> $clone() {
         return this;
     }
@@ -528,6 +532,29 @@ public final class Tuple<Element, First extends Element,
             }
         }
         return type;
+    }
+    
+    @Annotations({
+        @Annotation("shared"),
+        @Annotation("actual")})
+    @TypeInfo("ceylon.language::Tuple<Element,First,Rest>")
+    @Override
+    @NonNull
+    public Sequence<? extends Element> tuple() {
+        if (rest instanceof Empty) {
+            return this;
+        }
+        else {
+            int offset = array.length;
+            int size = (int) rest.getSize();
+            java.lang.Object[] arr = new java.lang.Object[offset + size];
+            System.arraycopy(array, 0, arr, 0, offset);
+            for (int i=0; i<size; i++) {
+                arr[i + offset] = rest.getFromFirst(i);
+            }
+            return (Sequence<? extends Element>) 
+                    instance($reifiedElement, arr);
+        }
     }
 
     private TypeDescriptor computeType() {
@@ -1043,18 +1070,18 @@ public final class Tuple<Element, First extends Element,
     }
 
     @Override @Ignore
-    public List<? extends Element> sublist(long from, long to) {
-        return sublistTo(to).sublistFrom(from);
+    public Sequential<? extends Element> sublist(long from, long to) {
+        return $ceylon$language$Sequence$impl().sublist(from, to);
     }
 
     @Override @Ignore
-    public List<? extends Element> sublistFrom(long from) {
-        return $ceylon$language$List$impl().sublistFrom(from);
+    public Sequential<? extends Element> sublistFrom(long from) {
+        return $ceylon$language$Sequence$impl().sublistFrom(from);
     }
 
     @Override @Ignore
-    public List<? extends Element> sublistTo(long to) {
-        return $ceylon$language$List$impl().sublistTo(to);
+    public Sequential<? extends Element> sublistTo(long to) {
+        return $ceylon$language$Sequence$impl().sublistTo(to);
     }
 
     @Override @Ignore
@@ -1159,8 +1186,8 @@ public final class Tuple<Element, First extends Element,
     }
 
     @Override @Ignore
-    public Iterable<? extends Element, ? extends java.lang.Object> getExceptLast() {
-        return $ceylon$language$Iterable$impl().getExceptLast();
+    public Sequential<? extends Element> getExceptLast() {
+        return $ceylon$language$Sequence$impl().getExceptLast();
     }
 
     @Override @Ignore

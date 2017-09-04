@@ -101,7 +101,7 @@ public final class String
         }
     }
 
-    @Ignore
+    @Ignore(handWritten = true)
     public String(final java.lang.String string) {
         value = string;
     }
@@ -119,8 +119,7 @@ public final class String
 
     @Ignore
     public static ceylon.language.String instance(java.lang.String s) {
-        if (s==null) return null;
-        return new String(s);
+        return s==null ? null : new String(s);
     }
 
     @Ignore
@@ -193,6 +192,7 @@ public final class String
         return value.equalsIgnoreCase(that);
     }
 
+    @Transient
     @Override
     public int hashCode() {
         return value.hashCode();
@@ -247,6 +247,7 @@ public final class String
         return value + otherValue;
     }
 
+    @Transient
     @Override
     @TypeInfo("ceylon.language::Integer")
     @AliasesAnnotation$annotation$(aliases = "length")
@@ -267,15 +268,16 @@ public final class String
     @Transient
     public Integer getLastIndex() {
         long length = getSize();
-        return (length == 0) ? null : Integer.instance(length - 1);
+        return length == 0 ? null : Integer.instance(length - 1);
     }
 
     @Ignore
     public static Integer getLastIndex(java.lang.String value) {
         long length = getSize(value);
-        return (length == 0) ? null : Integer.instance(length - 1);
+        return length == 0 ? null : Integer.instance(length - 1);
     }
 
+    @Transient
     @Override
     public boolean getEmpty() {
         return value.isEmpty();
@@ -534,6 +536,8 @@ public final class String
             final long from, final long length) {
         return new BaseIterable<Integer, java.lang.Object>
                 (Integer.$TypeDescriptor$, Null.$TypeDescriptor$) {
+            private static final long serialVersionUID = -3475029134090804161L;
+            
             final long stop = length+from;
             final int start = from<0 ? 0 : Util.toInt(from);
             final int len = java.lang.Character.charCount(element);
@@ -541,6 +545,8 @@ public final class String
             public Iterator<? extends Integer> iterator() {
                 return new BaseIterator<Integer>
                         (Integer.$TypeDescriptor$) {
+                    private static final long serialVersionUID = -2630286770653898228L;
+                    
                     int index = start;
                     int offset;
                     {
@@ -718,6 +724,7 @@ public final class String
         final String string = (String) substring;
         return new BaseIterable<Integer, java.lang.Object>
                 (Integer.$TypeDescriptor$, Null.$TypeDescriptor$) {
+            private static final long serialVersionUID = 6425626590377958731L;
             final int start = from<0 ? 0 : Util.toInt(from);
             final java.lang.String str = string.value;
             final int len = str.isEmpty() ? 1 :
@@ -727,6 +734,7 @@ public final class String
             public Iterator<? extends Integer> iterator() {
                 return new BaseIterator<Integer>
                         (Integer.$TypeDescriptor$) {
+                    private static final long serialVersionUID = -6489734355270518579L;
                     long index = from;
                     int offset;
                     {
@@ -1020,11 +1028,124 @@ public final class String
         return new StringIterator(value);
     }
     
+    private static class StringSublist extends BaseCharacterList {
+        private static final long serialVersionUID = 8844691936163990376L;
+        
+        private final java.lang.String value;
+        private final long to;
+        private int start;
+
+        private StringSublist(java.lang.String value, 
+                int offset, long from, long to) {
+            this.value = value;
+            
+            if (from<=0) {
+                this.start = offset;
+                this.to = to;
+            }
+            else {
+                this.to = to - from;
+                try {
+                    this.start =
+                            value.offsetByCodePoints(offset, 
+                                    Util.toInt(from));
+                }
+                catch (IndexOutOfBoundsException e) {
+                    this.start = value.length();
+                }
+            }
+
+        }
+
+        private StringSublist(java.lang.String value, long from, long to) {
+            this(value, 0, from, to);
+        }
+
+        @Override
+        public Character getFromFirst(long index) {
+            if (index>to || index<0) return null;
+            try {
+                int offset =
+                        value.offsetByCodePoints(start, 
+                                Util.toInt(index));
+                return Character.instance(
+                        value.codePointAt(offset));
+            }
+            catch (IndexOutOfBoundsException e) {
+                return null;
+            }
+        }
+
+        @Override
+        public boolean getEmpty() {
+            return to < 0 || start >= value.length();
+        }
+
+        @Override
+        public Integer getLastIndex() {
+            long size = getSize();
+            return size>0 ? Integer.instance(size-1) : null;
+        }
+
+        @Override
+        public long getSize() {
+            return Math.min(
+                    value.codePointCount(start, value.length()),
+                    to+1);
+        }
+
+        @Override
+        public Iterator<? extends Character> iterator() {
+            return new BaseIterator<Character>
+                    (Character.$TypeDescriptor$) {
+                private static final long serialVersionUID = 7900738754241223113L;
+                
+                int offset = start;
+                long index = 0;
+                @Override
+                public java.lang.Object next() {
+                    if (offset < value.length() && index <= to) {
+                        int codePoint = value.codePointAt(offset);
+                        offset += java.lang.Character.charCount(codePoint);
+                        index ++;
+                        return Character.instance(codePoint);
+                    }
+                    else {
+                        return finished_.get_();
+                    }
+                }
+            };
+        }
+
+        @Override
+        public boolean contains(java.lang.Object element) {
+            if (element instanceof Character) {
+                int index = value.indexOf(((Character)element).codePoint, start);
+                return index>=0 && value.codePointCount(start, index) <= to;
+            }
+            else {
+                return false;
+            }
+        }
+
+        @Override
+        public List<? extends Character> sublist(long f, long t) {
+            return new StringSublist(value, start, f, Math.min(t, to));
+        }
+
+        @Override
+        public List<? extends Character> sublistFrom(long f) {
+            return sublist(f, value.length());
+        }
+    }
+
     @Ignore
     private static class StringIterator 
             extends BaseIterator<Character> 
             implements ReifiedType {
         
+        private static final long serialVersionUID = 4814327780094420228L;
+
         private static TypeDescriptor $TypeDescriptor$ = 
                 TypeDescriptor.klass(StringIterator.class);
         
@@ -1431,12 +1552,12 @@ public final class String
     }
     
     @Ignore
-    public long substring$start() {
+    public long substring$from() {
         return 0;
     }
     
     @Ignore
-    public long substring$end() {
+    public long substring$end(long from) {
         return java.lang.Integer.MAX_VALUE;
     }
     
@@ -1483,185 +1604,40 @@ public final class String
     
     @Ignore
     public static List<? extends Character> sublist(
-            java.lang.String value, long from, long to) {
-        return instance(value).sublist(from, to);
+            final java.lang.String value, 
+            final long from, final long to) {
+        return new StringSublist(value, from, to);
+    }
+    
+    @Override
+    public List<? extends Character> sublist(
+            @Name("from") long from,
+            @Name("to") long to) {
+        return sublist(value, from, to);
     }
     
     @Ignore
     public static List<? extends Character> sublistTo(
             final java.lang.String value, final long to) {
-        return new BaseCharacterList() {
-            @Override
-            public Character getFromFirst(long index) {
-                if (index>to) {
-                    return null;
-                }
-                else {
-                    return String.getFromFirst(value, index);
-                }
-            }
-            @Override
-            public boolean getEmpty() {
-                return to<0 || value.isEmpty();
-            }
-            @Override
-            public Integer getLastIndex() {
-                long size = getSize();
-                return size>0 ? Integer.instance(size-1) : null;
-            }
-            @Override
-            public long getSize() {
-                long size = String.getSize(value);
-                return size>to ? to+1 : size;
-            }
-            @Override
-            public Iterator<? extends Character> iterator() {
-                return new BaseIterator<Character>
-                        (Character.$TypeDescriptor$) {
-                    int offset = 0;
-                    @Override
-                    public java.lang.Object next() {
-                        if (offset < value.length() && offset<=to) {
-                            int codePoint = value.codePointAt(offset);
-                            offset += java.lang.Character.charCount(codePoint);
-                            return Character.instance(codePoint);
-                        }
-                        else {
-                            return finished_.get_();
-                        }
-                    }
-                };
-            }
-            @Override
-            public List<? extends Character> sublistTo(long index) {
-                if (index>=to) {
-                    return this;
-                }
-                else {
-                    return String.sublistTo(value, to+index);
-                }
-            }
-            @Override
-            public boolean contains(java.lang.Object element) {
-                int index;
-                if (element instanceof String) {
-                    index = value.indexOf(((String)element).value);
-                }
-                else if (element instanceof Character) {
-                    index = value.indexOf(((Character)element).codePoint);
-                }
-                else {
-                    return false;
-                }
-                if (index<0) {
-                    return false;
-                }
-                else {
-                    return value.offsetByCodePoints(0, index)<=to;
-                }
-            }
-        };
+        return sublist(value, 0, to);
     }
     
     @Override
     public List<? extends Character> sublistTo(
             @Name("to") long to) {
-        return sublistTo(value, to);
+        return sublist(value, 0, to);
     }
     
     @Ignore
     public static List<? extends Character> sublistFrom(
             final java.lang.String value, final long from) {
-        return new BaseCharacterList() {
-            int start;
-            {
-                if (from<=0) {
-                    start = 0;
-                }
-                else {
-                    try {
-                        start = 
-                                value.offsetByCodePoints(0, 
-                                        Util.toInt(from));
-                    }
-                    catch (IndexOutOfBoundsException e) {
-                        start = value.length();
-                    }
-                }
-            }
-            @Override
-            public Character getFromFirst(long index) {
-                try {
-                    int offset =
-                            value.offsetByCodePoints(start, 
-                                    Util.toInt(index));
-                    return Character.instance(
-                            value.codePointAt(offset));
-                }
-                catch (IndexOutOfBoundsException e) {
-                    return null;
-                }
-            }
-            @Override
-            public boolean getEmpty() {
-                return start >= value.length();
-            }
-            @Override
-            public Integer getLastIndex() {
-                long size = getSize();
-                return size>0 ? Integer.instance(size-1) : null;
-            }
-            @Override
-            public long getSize() {
-                return value.codePointCount(start, 
-                                value.length());
-            }
-            @Override
-            public Iterator<? extends Character> iterator() {
-                return new BaseIterator<Character>
-                        (Character.$TypeDescriptor$) {
-                    int offset = start;
-                    @Override
-                    public java.lang.Object next() {
-                        if (offset < value.length()) {
-                            int codePoint = value.codePointAt(offset);
-                            offset += java.lang.Character.charCount(codePoint);
-                            return Character.instance(codePoint);
-                        }
-                        else {
-                            return finished_.get_();
-                        }
-                    }
-                };
-            }
-            @Override
-            public List<? extends Character> sublistFrom(long index) {
-                if (index<=0) {
-                    return this;
-                }
-                else {
-                    return String.sublistFrom(value, from+index);
-                }
-            }
-            @Override
-            public boolean contains(java.lang.Object element) {
-                if (element instanceof String) {
-                    return value.indexOf(((String)element).value, start) >= 0;
-                }
-                else if (element instanceof Character) {
-                    return value.indexOf(((Character)element).codePoint, start) >= 0;
-                }
-                else {
-                    return false;
-                }
-            }
-        };
+        return sublist(value, from, value.length());
     }
     
     @Override
     public List<? extends Character> sublistFrom(
             @Name("from") long from) {
-        return sublistFrom(value, from);
+        return sublist(value, from, value.length());
     }
 
     @Override
@@ -2051,6 +2027,7 @@ public final class String
             TypeDescriptor.klass(Tuple.class, Character.$TypeDescriptor$, 
                     Character.$TypeDescriptor$, Empty.$TypeDescriptor$),
             "whitespace", (short)-1) {
+        private static final long serialVersionUID = 6603200992605336560L;
         @Override
         public Boolean $call$(java.lang.Object ch) {
             return Boolean.instance(((Character) ch).getWhitespace());
@@ -2063,6 +2040,8 @@ public final class String
             TypeDescriptor.klass(Tuple.class, Character.$TypeDescriptor$, 
                     Character.$TypeDescriptor$, Empty.$TypeDescriptor$),
             "newlines", (short)-1) {
+        private static final long serialVersionUID = 1760644948985787386L;
+
         @Override
         public Boolean $call$(java.lang.Object ch) {
             return Boolean.instance(((Character) ch).intValue()=='\n');
@@ -2075,6 +2054,8 @@ public final class String
             TypeDescriptor.klass(Tuple.class, Character.$TypeDescriptor$, 
                     Character.$TypeDescriptor$, Empty.$TypeDescriptor$),
             "returns", (short)-1) {
+        private static final long serialVersionUID = 4959620668480451176L;
+
         @Override
         public Boolean $call$(java.lang.Object ch) {
             return Boolean.instance(((Character) ch).intValue()=='\r');
@@ -2086,6 +2067,8 @@ public final class String
             TypeDescriptor.klass(Tuple.class, $TypeDescriptor$, 
                     $TypeDescriptor$, Empty.$TypeDescriptor$),
             "", (short)-1) {
+        private static final long serialVersionUID = 6922227726110069651L;
+
         @Override
         public String $call$(java.lang.Object str) {
             return instance(trimTrailing(((String)str).value, RETURNS));
@@ -2099,6 +2082,8 @@ public final class String
                     TypeDescriptor.klass(Sequence.class,$TypeDescriptor$), 
                     Empty.$TypeDescriptor$),
                 "", (short)-1) {
+        private static final long serialVersionUID = 5847042412080489763L;
+
         @Override
         public String $call$(java.lang.Object seq) {
             @SuppressWarnings("unchecked")
@@ -2202,10 +2187,17 @@ public final class String
         return instance(string);
     }
 
+    @Transient
     @Override
     public String getRest() {
         return value.isEmpty() ? this :
             instance(value.substring(value.offsetByCodePoints(0, 1)));
+    }
+
+    @Override
+    public String getExceptLast() {
+        return value.isEmpty() ? this :
+            instance(value.substring(0, value.offsetByCodePoints(value.length(), -1)));
     }
 
     @Ignore
@@ -2215,11 +2207,13 @@ public final class String
     }
     
     @Ignore
-    public static Iterable<? extends Character,?> 
+    public static java.lang.String 
     getExceptLast(java.lang.String value) {
-    	return instance(value).getExceptLast();
+        return value.isEmpty() ? "" :
+            value.substring(0, value.offsetByCodePoints(value.length(), -1));
     }
 
+    @Transient
     @Override
     @TypeInfo("ceylon.language::Null|ceylon.language::Character")
     public Character getFirst() {
@@ -2235,6 +2229,7 @@ public final class String
         }
     }
 
+    @Transient
     @Override
     @TypeInfo("ceylon.language::Null|ceylon.language::Character")
     public Character getLast() {
@@ -2385,10 +2380,14 @@ public final class String
             final Callable<? extends Boolean> selecting) {
         return new BaseIterable<Entry<? extends Integer, ? extends Character>, java.lang.Object>
             (INT_TO_CHAR_ENTRY_DESCRIPTOR, Null.$TypeDescriptor$) {
+            private static final long serialVersionUID = -5641994481544252618L;
+
     @Override
     public Iterator<? extends Entry<? extends Integer, ? extends Character>> iterator() {
         return new BaseIterator<Entry<? extends Integer, ? extends Character>>
                 (INT_TO_CHAR_ENTRY_DESCRIPTOR) {
+            private static final long serialVersionUID = -1761302569992096904L;
+            
             int offset = 0;
             int index = 0;
             @Override
@@ -2441,10 +2440,14 @@ public final class String
             final Callable<? extends Boolean> fun) {
         return new BaseIterable<Integer, java.lang.Object>
                 (Integer.$TypeDescriptor$, Null.$TypeDescriptor$) {
+            private static final long serialVersionUID = 8508467332888410586L;
+
             @Override
             public Iterator<? extends Integer> iterator() {
                 return new BaseIterator<Integer>
                         (Integer.$TypeDescriptor$) {
+                    private static final long serialVersionUID = -5792659316006135215L;
+                    
                     int offset = 0;
                     int index = 0;
                     @Override
@@ -3208,11 +3211,6 @@ public final class String
     }*/
 
     @Override @Ignore
-    public Iterable<? extends Character, ? extends java.lang.Object> getExceptLast() {
-        return $ceylon$language$Iterable$impl().getExceptLast();
-    }
-
-    @Override @Ignore
     public Iterable<? extends Entry<? extends Integer, ? extends Character>, ? extends java.lang.Object> getIndexed() {
         return $ceylon$language$Iterable$impl().getIndexed();
     }
@@ -3405,11 +3403,6 @@ public final class String
         return $ceylon$language$List$impl().patch$length(arg0, arg1, arg2);
     }
     
-    @Override @Ignore
-    public List<? extends Character> sublist(long arg0, long arg1) {
-        return $ceylon$language$List$impl().sublist(arg0, arg1);
-    }
-
     @Override @Ignore
     public SearchableList$impl<Character> $ceylon$language$SearchableList$impl() {
         return new SearchableList$impl<Character>(Character.$TypeDescriptor$, this);

@@ -59,10 +59,14 @@ import com.redhat.ceylon.model.typechecker.model.Class;
 import com.redhat.ceylon.model.typechecker.model.ClassOrInterface;
 import com.redhat.ceylon.model.typechecker.model.Constructor;
 import com.redhat.ceylon.model.typechecker.model.Declaration;
+import com.redhat.ceylon.model.typechecker.model.Function;
+import com.redhat.ceylon.model.typechecker.model.FunctionOrValue;
 import com.redhat.ceylon.model.typechecker.model.Interface;
+import com.redhat.ceylon.model.typechecker.model.ModelUtil;
 import com.redhat.ceylon.model.typechecker.model.Parameter;
+import com.redhat.ceylon.model.typechecker.model.Setter;
 import com.redhat.ceylon.model.typechecker.model.Type;
-import com.redhat.ceylon.model.typechecker.model.TypeDeclaration;
+import com.redhat.ceylon.model.typechecker.model.TypeAlias;
 import com.redhat.ceylon.model.typechecker.model.TypeParameter;
 import com.redhat.ceylon.model.typechecker.model.Value;
 
@@ -109,9 +113,10 @@ public class CeylonVisitor extends Visitor {
         }
         int annots = gen.checkCompilerAnnotations(decl, defs);
 
-        if (Decl.withinClassOrInterface(decl)) {
-            if (Decl.withinInterface(decl)) {
-                classBuilder.getCompanionBuilder((Interface)decl.getDeclarationModel().getContainer()).defs(gen.classGen().transform(decl));
+        TypeAlias dec = decl.getDeclarationModel();
+        if (dec.isClassOrInterfaceMember()) {
+            if (dec.isInterfaceMember()) {
+                classBuilder.getCompanionBuilder((Interface)dec.getContainer()).defs(gen.classGen().transform(decl));
             } else {
                 classBuilder.defs(gen.classGen().transform(decl));
             }
@@ -142,8 +147,8 @@ public class CeylonVisitor extends Visitor {
             return;
         int annots = gen.checkCompilerAnnotations(decl, defs);
 
-        if (Decl.withinClassOrInterface(decl)) {
-            if (Decl.withinInterface(decl)) {
+        if (decl.getDeclarationModel().isClassOrInterfaceMember()) {
+            if (decl.getDeclarationModel().isInterfaceMember()) {
                 classBuilder.getCompanionBuilder((Interface)decl.getDeclarationModel().getContainer()).defs(gen.classGen().transform(decl));
             } else {
                 classBuilder.defs(gen.classGen().transform(decl));
@@ -187,7 +192,7 @@ public class CeylonVisitor extends Visitor {
                     }
                 } else {
                     // implicitly delegating to superclass initializer
-                    Type et = Decl.getConstructedClass(ctorModel).getExtendedType();
+                    Type et = ModelUtil.getConstructedClass(ctorModel).getExtendedType();
                     if (et!=null) {
                         Declaration delegatedDecl = et.getDeclaration();
                         delegates.put(ctorModel, ctorDelegation(ctorModel, delegatedDecl, broken));
@@ -208,7 +213,7 @@ public class CeylonVisitor extends Visitor {
                     delegates.put(ctorModel, ctorDelegation(ctorModel, delegatedDecl, broken));
                 } else {
                     // implicitly delegating to superclass initializer
-                    Type et = Decl.getConstructedClass(ctorModel).getExtendedType();
+                    Type et = ModelUtil.getConstructedClass(ctorModel).getExtendedType();
                     if (et!=null) {
                         Declaration delegatedDecl = et.getDeclaration();
                         delegates.put(ctorModel, ctorDelegation(ctorModel, delegatedDecl, broken));
@@ -276,7 +281,7 @@ public class CeylonVisitor extends Visitor {
                 ctor.getBlock(),
                 ctor.getEnumerated(), 
                 delegates);
-        Class clz = Decl.getConstructedClass(ctor.getEnumerated());
+        Class clz = ModelUtil.getConstructedClass(ctor.getEnumerated());
         Value singletonModel = ctor.getDeclarationModel();
         // generate a field
         AttributeDefinitionBuilder adb = AttributeDefinitionBuilder
@@ -291,7 +296,7 @@ public class CeylonVisitor extends Visitor {
         if (clz.isToplevel()) {
             adb.modifiers((singletonModel.isShared() ? PUBLIC : PRIVATE) | STATIC | FINAL);
             adb.initialValue(gen.make().NewClass(null, null, 
-                    gen.naming.makeTypeDeclarationExpression(null, Decl.getConstructedClass(ctor.getEnumerated())), 
+                    gen.naming.makeTypeDeclarationExpression(null, ModelUtil.getConstructedClass(ctor.getEnumerated())), 
                     List.<JCExpression>of(
                             gen.make().TypeCast(
                                     gen.naming.makeNamedConstructorType(ctor.getEnumerated(), false),
@@ -312,7 +317,7 @@ public class CeylonVisitor extends Visitor {
             gen.make().If(gen.make().Binary(JCTree.Tag.EQ, field.makeIdent(), gen.makeNull()),
                     gen.make().Exec(gen.make().Assign(field.makeIdent(),
                             gen.make().NewClass(null, null, 
-                                    gen.naming.makeTypeDeclarationExpression(null, Decl.getConstructedClass(ctor.getEnumerated())), 
+                                    gen.naming.makeTypeDeclarationExpression(null, ModelUtil.getConstructedClass(ctor.getEnumerated())), 
                                     List.<JCExpression>of(
                                             gen.make().TypeCast(
                                                     gen.naming.makeNamedConstructorType(ctor.getEnumerated(), false),
@@ -324,13 +329,13 @@ public class CeylonVisitor extends Visitor {
             if (clz.isStatic()) {
                 mods2 |= STATIC;
             }
-            classBuilder.getContainingClassBuilder().defs(gen.makeVar(mods2, field, gen.naming.makeTypeDeclarationExpression(null, Decl.getConstructedClass(ctor.getEnumerated())), gen.makeNull()));
+            classBuilder.getContainingClassBuilder().defs(gen.makeVar(mods2, field, gen.naming.makeTypeDeclarationExpression(null, ModelUtil.getConstructedClass(ctor.getEnumerated())), gen.makeNull()));
             classBuilder.getContainingClassBuilder().defs(adb.build());
         } else {
             // LOCAL
             // we have to first make an empty box
             JCNewClass initialValue = gen.make().NewClass(null, null, 
-                    gen.naming.makeTypeDeclarationExpression(null, Decl.getConstructedClass(ctor.getEnumerated())), 
+                    gen.naming.makeTypeDeclarationExpression(null, ModelUtil.getConstructedClass(ctor.getEnumerated())), 
                     List.<JCExpression>of(
                             gen.make().TypeCast(
                                     gen.naming.makeNamedConstructorType(ctor.getEnumerated(), false),
@@ -357,8 +362,9 @@ public class CeylonVisitor extends Visitor {
         
         if (parameterList != null) {
             for (Parameter param : parameterList.getModel().getParameters()) {
-                if (Naming.aliasConstructorParameterName(param.getModel())) {
-                    gen.naming.addVariableSubst(param.getModel(), gen.naming.suffixName(Suffix.$param$, param.getName()));
+                FunctionOrValue model = param.getModel();
+                if (Naming.aliasConstructorParameterName(model)) {
+                    gen.naming.addVariableSubst(model, Naming.suffixName(Suffix.$param$, param.getName()));
                 }
             }
         }
@@ -536,7 +542,7 @@ public class CeylonVisitor extends Visitor {
         if (!acceptDeclaration(decl))
             return;
         int annots = gen.checkCompilerAnnotations(decl, defs);
-        if (Decl.withinClass(decl)) {
+        if (decl.getDeclarationModel().isClassMember()) {
             classBuilder.defs(gen.classGen().transformObjectDefinition(decl, classBuilder));
         } else {
             appendList(gen.classGen().transformObjectDefinition(decl, null));
@@ -556,16 +562,17 @@ public class CeylonVisitor extends Visitor {
         if (!accept)
             return;
         int annots = gen.checkCompilerAnnotations(decl, defs);
-        if (Decl.withinClassOrInterface(decl) && !Decl.isLocalToInitializer(decl)
-                || decl.getDeclarationModel().isStatic()) {
+        Value dec = decl.getDeclarationModel();
+        if (dec.isClassOrInterfaceMember() && !ModelUtil.isLocalToInitializer(dec)
+                || dec.isStatic()) {
             // Class attributes
             gen.classGen().transform(decl, classBuilder);
-        } else if (Decl.isToplevel(decl)) {
+        } else if (dec.isToplevel()) {
             topattrBuilder.add(decl);
-        } else if ((Decl.isLocal(decl)) 
-                && ((Decl.isCaptured(decl) && Decl.isVariable(decl))
-                        || Decl.isTransient(decl)
-                        || Decl.hasSetter(decl))) {
+        } else if (Decl.isLocal(dec)
+                && (ModelUtil.isCaptured(dec) && Decl.isVariable(dec)
+                        || dec.isTransient()
+                        || Decl.hasSetter(dec))) {
             // Captured local attributes get turned into an inner getter/setter class
             appendList(gen.transform(decl));
         } else {
@@ -583,17 +590,18 @@ public class CeylonVisitor extends Visitor {
         if (!acceptDeclaration(decl))
             return;
         int annots = gen.checkCompilerAnnotations(decl, defs);
-        if (Decl.withinClass(decl) && !Decl.isLocalToInitializer(decl)
-                || decl.getDeclarationModel().isStatic()) {
+        Value dec = decl.getDeclarationModel();
+        if (dec.isClassMember() && !ModelUtil.isLocalToInitializer(dec)
+                || dec.isStatic()) {
             classBuilder.attribute(gen.classGen().transform(decl, false));
-        } else if (Decl.withinInterface(decl) && !Decl.isLocalToInitializer(decl)) {
+        } else if (dec.isInterfaceMember() && !ModelUtil.isLocalToInitializer(dec)) {
             classBuilder.attribute(gen.classGen().transform(decl, false));
             AttributeDefinitionBuilder adb = gen.classGen().transform(decl, true);
-            if (decl.getDeclarationModel().isShared()) {
+            if (dec.isShared()) {
                 adb.ignoreAnnotations();
             }
-            classBuilder.getCompanionBuilder((Interface)decl.getDeclarationModel().getContainer()).attribute(adb);
-        } else if (Decl.isToplevel(decl)) {
+            classBuilder.getCompanionBuilder((Interface)dec.getContainer()).attribute(adb);
+        } else if (dec.isToplevel()) {
             topattrBuilder.add(decl);
         } else {
             appendList(gen.transform(decl));
@@ -615,17 +623,18 @@ public class CeylonVisitor extends Visitor {
         if (!acceptDeclaration(decl))
             return;
         int annots = gen.checkCompilerAnnotations(decl, defs);
-        if (Decl.withinClass(decl) && !Decl.isLocalToInitializer(decl)
-                || decl.getDeclarationModel().getGetter().isStatic()) {
+        Setter dec = decl.getDeclarationModel();
+        if (dec.isClassMember() && !ModelUtil.isLocalToInitializer(dec)
+                || dec.getGetter().isStatic()) {
             classBuilder.attribute(gen.classGen().transform(decl, false));
-        } else if (Decl.withinInterface(decl)) {
+        } else if (dec.isInterfaceMember()) {
             classBuilder.attribute(gen.classGen().transform(decl, false));
             AttributeDefinitionBuilder adb = gen.classGen().transform(decl, true);
-            if (decl.getDeclarationModel().isShared()) {
+            if (dec.isShared()) {
                 adb.ignoreAnnotations();
             }
-            classBuilder.getCompanionBuilder((Interface)decl.getDeclarationModel().getContainer()).attribute(adb);
-        } else if (Decl.isToplevel(decl)) {
+            classBuilder.getCompanionBuilder((Interface)dec.getContainer()).attribute(adb);
+        } else if (dec.isToplevel()) {
             topattrBuilder.add(decl);
         } else {
             appendList(gen.transform(decl));
@@ -641,8 +650,9 @@ public class CeylonVisitor extends Visitor {
         if (!acceptDeclaration(decl))
             return;
         int annots = gen.checkCompilerAnnotations(decl, defs);
-        if (Decl.withinClassOrInterface(decl)
-                && (!Decl.isDeferred(decl) || Decl.isCaptured(decl))) {
+        Function dec = decl.getDeclarationModel();
+        if (dec.isClassOrInterfaceMember()
+                && (!Decl.isDeferred(dec) || ModelUtil.isCaptured(dec))) {
             classBuilder.method(decl, plan);
         } else {
             appendList(gen.classGen().transformWrappedMethod(decl, plan));
@@ -674,7 +684,7 @@ public class CeylonVisitor extends Visitor {
         ClassOrInterface forDefinition = classBuilder.getForDefinition();
         Type thisType = forDefinition != null ? forDefinition.getType() : null;
         Type extended = extendedType.getType().getTypeModel();
-        if (extended.getDeclaration() instanceof Constructor) {
+        if (extended.isConstructor()) {
             extended = extended.getQualifyingType();
         }
         classBuilder.extending(thisType, extended);
@@ -1092,9 +1102,9 @@ public class CeylonVisitor extends Visitor {
                 arg = "java.lang.RuntimeException";
             }
             try {
-                java.lang.Class<? extends Throwable> exceptionClass = (java.lang.Class<? extends RuntimeException>)java.lang.Class.forName(arg, true, getClass().getClassLoader());
-                Throwable exception = exceptionClass.newInstance();
-                if (exception instanceof RuntimeException) {                    
+                java.lang.Class<?> exceptionClass = java.lang.Class.forName(arg, true, getClass().getClassLoader());
+                Throwable exception = (Throwable) exceptionClass.newInstance();
+                if (exception instanceof RuntimeException) {
                     throw (RuntimeException)exception;
                 } else if (exception instanceof Error) {
                     throw (Error)exception;

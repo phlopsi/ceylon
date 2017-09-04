@@ -27,6 +27,8 @@ import static com.redhat.ceylon.langtools.tools.javac.code.Flags.PUBLIC;
 import static com.redhat.ceylon.langtools.tools.javac.code.Flags.STATIC;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.redhat.ceylon.compiler.java.codegen.recovery.TransformationPlan;
 import com.redhat.ceylon.compiler.typechecker.tree.Node;
@@ -46,7 +48,7 @@ import com.redhat.ceylon.langtools.tools.javac.util.Name;
 import com.redhat.ceylon.model.typechecker.model.Annotation;
 import com.redhat.ceylon.model.typechecker.model.Class;
 import com.redhat.ceylon.model.typechecker.model.ClassOrInterface;
-import com.redhat.ceylon.model.typechecker.model.Generic;
+import com.redhat.ceylon.model.typechecker.model.Constructor;
 import com.redhat.ceylon.model.typechecker.model.Interface;
 import com.redhat.ceylon.model.typechecker.model.Type;
 import com.redhat.ceylon.model.typechecker.model.TypeDeclaration;
@@ -76,7 +78,19 @@ public class ClassDefinitionBuilder
     private boolean isLocal = false;
     
     private boolean hasConstructors = false;
+    private boolean isAbstraction = false;
     
+    private Set<String> usedConstructorNames = new HashSet<>();
+    
+    /**
+     * To avoid generating constructor name classes twice
+     * for overloaded named constructors. 
+     * @param isDelegation 
+     */
+    public boolean hasGeneratedConstructorName(Constructor ctor, boolean isDelegation) {
+        return !usedConstructorNames.add(isDelegation ? "$$$" + ctor.getName() : ctor.getName());
+    }
+
     /** 
      * Remembers the class which we're defining, because we need this for special
      * cases in the super constructor invocation.
@@ -157,7 +171,7 @@ public class ClassDefinitionBuilder
     public String toString() {
         return "CDB for " + (isInterface() ? "interface " : "class ") + name;
     }
-
+    
     ClassDefinitionBuilder getContainingClassBuilder() {
         return containingClassBuilder;
     }
@@ -375,7 +389,9 @@ public class ClassDefinitionBuilder
         if (!isAlias) {
             this.thisType = thisType;
             this.extendingType = extendingType;
-            this.hasConstructors = ((Class)thisType.getDeclaration()).hasConstructors() || ((Class)thisType.getDeclaration()).hasEnumerated();
+            Class cl = (Class)thisType.getDeclaration();
+            this.hasConstructors = cl.hasConstructors() || cl.hasEnumerated();
+            this.isAbstraction = cl.isAbstraction();
         }
         return this;
     }
@@ -442,11 +458,12 @@ public class ClassDefinitionBuilder
         }else if (ignoreAnnotations) {
             ret = ret.prependList(gen.makeAtIgnore());
         }else{
-            boolean jpaConstructor = thisType != null && Strategy.generateJpaCtor((Class)thisType.getDeclaration());
+//            boolean jpaConstructor = thisType != null && Strategy.generateJpaCtor((Class)thisType.getDeclaration());
             if (hasConstructors || thisType != null) {
                 Type exType = extendingType;
                 if (extendingType != null
-                        && extendingType.getDeclaration().isNativeHeader()) {
+                        && extendingType.getDeclaration()
+                                .isNativeHeader()) {
                     exType = extendingType.getExtendedType();
                 }
                 ret = ret.prependList(gen.makeAtClass(thisType, exType, 
@@ -506,9 +523,12 @@ public class ClassDefinitionBuilder
     /**
      * Appends the given trees.
      */
-    public ClassDefinitionBuilder defs(List<JCTree> defs) {
+    public ClassDefinitionBuilder defs(List<? extends JCTree> defs) {
         if (defs != null) {
-            this.defs.appendList(defs);
+            while (defs.nonEmpty()) {
+                this.defs.append(defs.head);
+                defs = defs.tail;
+            }
         }
         return this;
     }
@@ -536,9 +556,8 @@ public class ClassDefinitionBuilder
         if(companionBuilder == null)
             return null;
         // make sure we get fields and init code for reified params
-        if(decl instanceof Generic) {
-            companionBuilder.reifiedTypeParameters(((Generic)decl).getTypeParameters());
-        }
+        companionBuilder.reifiedTypeParameters(decl.getTypeParameters());
+
         Type thisType = decl.getType();
         companionBuilder.field(PRIVATE | FINAL, 
                 "$this", 
@@ -546,9 +565,7 @@ public class ClassDefinitionBuilder
                 null, false, gen.makeAtIgnore());
         MethodDefinitionBuilder ctor = companionBuilder.addConstructorWithInitCode(decl.isDeprecated());
         ctor.ignoreModelAnnotations();
-        if(decl instanceof Generic) {
-            ctor.reifiedTypeParameters(((Generic)decl).getTypeParameters());
-        }
+        ctor.reifiedTypeParameters(decl.getTypeParameters());
         ctor.modifiers(decl.isShared() ? PUBLIC : 0);
         ParameterDefinitionBuilder pdb = ParameterDefinitionBuilder.implicitParameter(gen, "$this");
         pdb.type(new TransformedType(gen.makeJavaType(thisType), null, gen.makeAtNonNull()));
@@ -561,9 +578,8 @@ public class ClassDefinitionBuilder
                                 gen.naming.makeQuotedThis())));
         ctor.body(bodyStatements.toList());
         
-        if(decl instanceof Generic
-                && !((Generic)decl).getTypeParameters().isEmpty()) {
-            companionBuilder.addRefineReifiedTypeParametersMethod(((Generic)decl).getTypeParameters());
+        if(decl.isParameterized()) {
+            companionBuilder.addRefineReifiedTypeParametersMethod(decl.getTypeParameters());
         }
         return companionBuilder;
     }
@@ -615,7 +631,11 @@ public class ClassDefinitionBuilder
 
     public ClassDefinitionBuilder forDefinition(ClassOrInterface def) {
         this.forDefinition = def;
-        this.hasConstructors = def instanceof Class && (((Class)def).hasConstructors() || ((Class)def).hasEnumerated());
+        if (def instanceof Class) {
+            Class cl = (Class)def;
+            this.hasConstructors = cl.hasConstructors() || cl.hasEnumerated();
+            this.isAbstraction = cl.isAbstraction();
+        }
         return this;
     }
 
